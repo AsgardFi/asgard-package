@@ -1,6 +1,6 @@
 {
-  "name": "@asgard/marginfi-client-v2-patch",
-  "version": "2.9.0",
+  "name": "@asgardfi/marginfi-client-v2-patch",
+  "version": "0.0.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",

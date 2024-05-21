@@ -114,7 +114,6 @@ class MarginfiClient {
     connection: Connection,
     clientOptions?: MarginfiClientOptions
   ) {
-    console.log("yoy yoy yoy")
     const debug = require("debug")("mfi:client");
     debug(
       "Loading Marginfi Client\n\tprogram: %s\n\tenv: %s\n\tgroup: %s\n\turl: %s",

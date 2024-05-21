@@ -81,7 +81,6 @@ export function getConfig(
   environment: Environment = "production",
   overrides?: Partial<Omit<MarginfiConfig, "environment">>
 ): MarginfiConfig {
-  console.log("config reflected")
   return {
     ...getMarginfiConfig(environment, overrides),
   };
