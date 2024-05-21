@@ -61,7 +61,6 @@ function getMarginfiConfig(environment, overrides) {
  * Retrieve config per environment
  */
 function getConfig(environment = "production", overrides) {
-    console.log("config reflected");
     return {
         ...getMarginfiConfig(environment, overrides),
     };

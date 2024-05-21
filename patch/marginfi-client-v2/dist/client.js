@@ -49,7 +49,6 @@ class MarginfiClient {
      * @returns MarginfiClient instance
      */
     static async fetch(config, wallet, connection, clientOptions) {
-        console.log("yoy yoy yoy");
         const debug = require("debug")("mfi:client");
         debug("Loading Marginfi Client\n\tprogram: %s\n\tenv: %s\n\tgroup: %s\n\turl: %s", config.programId, config.environment, config.groupPk, connection.rpcEndpoint);
         const confirmOpts = clientOptions?.confirmOpts ?? {};
