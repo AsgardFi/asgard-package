@@ -110,7 +110,9 @@ declare class MarginfiClient {
      *
      * @throws ProcessTransactionError
      */
-    processTransaction(transaction: Transaction | VersionedTransaction, signers?: Array<Signer>, opts?: TransactionOptions): Promise<TransactionSignature>;
+    processTransaction(transaction: Transaction | VersionedTransaction, signers?: Array<Signer>, opts?: TransactionOptions, connection_args?: Connection): Promise<TransactionSignature>;
+    signTransaction(transaction: Transaction | VersionedTransaction, signers?: Array<Signer>, connectionArgs?: Connection): Promise<VersionedTransaction>;
+    sendAndConfirmTransaction(versionedTransaction: VersionedTransaction, opts?: TransactionOptions, connectionArgs?: Connection): Promise<TransactionSignature>;
     simulateTransaction(transaction: Transaction | VersionedTransaction, accountsToInspect: PublicKey[]): Promise<(Buffer | null)[]>;
 }
 export default MarginfiClient;

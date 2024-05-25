@@ -533,12 +533,15 @@ class MarginfiClient {
   async processTransaction(
     transaction: Transaction | VersionedTransaction,
     signers?: Array<Signer>,
-    opts?: TransactionOptions
+    opts?: TransactionOptions,
+    connection_args?: Connection
   ): Promise<TransactionSignature> {
     let signature: TransactionSignature = "";
 
     let versionedTransaction: VersionedTransaction;
-    const connection = new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
+    // const connection = new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
+    const connection = connection_args ? connection_args : new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
+
     const sendConnection = this.sendEndpoint ? new Connection(this.sendEndpoint, this.provider.opts) : connection;
     let minContextSlot: number;
     let blockhash: string;
@@ -686,7 +689,168 @@ class MarginfiClient {
         }
       }
       console.log("fallthrough error", error);
-      throw new ProcessTransactionError("Something went wrong", ProcessTransactionErrorType.FallthroughError);
+      throw new ProcessTransactionError(error.message, ProcessTransactionErrorType.FallthroughError);
+    }
+  }
+
+  async signTransaction(
+    transaction: Transaction | VersionedTransaction,
+    signers?: Array<Signer>,
+    connectionArgs?: Connection
+): Promise<VersionedTransaction> {
+
+    const connection = connectionArgs 
+        ? connectionArgs 
+        : new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
+
+    let versionedTransaction: VersionedTransaction;
+    let blockhash: string;
+
+    try {
+        const { value: { blockhash: latestBlockhash } } = await connection.getLatestBlockhashAndContext();
+        blockhash = latestBlockhash;
+
+        if (transaction instanceof Transaction) {
+            const versionedMessage = new TransactionMessage({
+                instructions: transaction.instructions,
+                payerKey: this.provider.publicKey,
+                recentBlockhash: blockhash,
+            });
+
+            versionedTransaction = new VersionedTransaction(
+                versionedMessage.compileToV0Message(this.addressLookupTables)
+            );
+        } else {
+            versionedTransaction = transaction;
+        }
+
+        if (signers) {
+            versionedTransaction.sign(signers);
+        }
+    } catch (error: any) {
+        console.error("Failed to build the transaction", error);
+        throw new ProcessTransactionError(
+            error.message, 
+            ProcessTransactionErrorType.TransactionBuildingError
+        );
+    }
+
+    try {
+        versionedTransaction = await this.wallet.signTransaction(versionedTransaction);
+        return versionedTransaction;
+    } catch (error: any) {
+        console.error("Failed to sign the transaction", error);
+        throw new ProcessTransactionError(
+          error.message, 
+            ProcessTransactionErrorType.FallthroughError
+        );
+    }
+  }
+
+  async sendAndConfirmTransaction(
+    versionedTransaction: VersionedTransaction,
+    opts?: TransactionOptions,
+    connectionArgs?: Connection
+  ): Promise<TransactionSignature> {
+    
+    const connection = connectionArgs ?? new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
+    const sendConnection = this.sendEndpoint ? new Connection(this.sendEndpoint, this.provider.opts) : connection;
+    
+    let signature: TransactionSignature = "";
+    let minContextSlot: number;
+    let blockhash: string;
+    let lastValidBlockHeight: number;
+
+    try {
+      const getLatestBlockhashAndContext = await connection.getLatestBlockhashAndContext();
+
+      minContextSlot = getLatestBlockhashAndContext.context.slot - 4;
+      blockhash = getLatestBlockhashAndContext.value.blockhash;
+      lastValidBlockHeight = getLatestBlockhashAndContext.value.lastValidBlockHeight;
+
+      let mergedOpts: ConfirmOptions = {
+        ...DEFAULT_CONFIRM_OPTS,
+        commitment: connection.commitment ?? DEFAULT_CONFIRM_OPTS.commitment,
+        preflightCommitment: connection.commitment ?? DEFAULT_CONFIRM_OPTS.commitment,
+        minContextSlot,
+        ...opts,
+      };
+
+      if (this.spamSendTx) {
+        let status = "pending";
+        if (this.skipPreflightInSpam) {
+          const response = await connection.simulateTransaction(
+            versionedTransaction,
+            opts ?? { minContextSlot, sigVerify: false }
+          );
+          if (response.value.err)
+            throw new SendTransactionError(JSON.stringify(response.value.err), response.value.logs ?? []);
+        }
+
+        while (true) {
+          signature = await sendConnection.sendTransaction(versionedTransaction, {
+            // minContextSlot: mergedOpts.minContextSlot,
+            skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
+            preflightCommitment: mergedOpts.preflightCommitment,
+            maxRetries: mergedOpts.maxRetries,
+          });
+          for (let i = 0; i < 5; i++) {
+            const signatureStatus = await connection.getSignatureStatus(signature, {
+              searchTransactionHistory: false,
+            });
+            if (signatureStatus.value?.confirmationStatus === "confirmed") {
+              status = "confirmed";
+              break;
+            }
+            await sleep(200);
+          }
+
+          let blockHeight = await connection.getBlockHeight();
+          if (blockHeight > lastValidBlockHeight) {
+            throw new ProcessTransactionError(
+              "Transaction was not confirmed within †he alloted time",
+              ProcessTransactionErrorType.TimeoutError
+            );
+          }
+
+          if (status === "confirmed") {
+            break;
+          }
+        }
+      } else {
+        signature = await connection.sendTransaction(versionedTransaction, {
+          // minContextSlot: mergedOpts.minContextSlot,
+          skipPreflight: mergedOpts.skipPreflight,
+          preflightCommitment: mergedOpts.preflightCommitment,
+          maxRetries: mergedOpts.maxRetries,
+        });
+        await connection.confirmTransaction(
+          {
+            blockhash,
+            lastValidBlockHeight,
+            signature,
+          },
+          mergedOpts.commitment
+        );
+      }
+
+      return signature;
+    } catch (error: any) {
+      if (error instanceof SendTransactionError) {
+        if (error.logs) {
+          console.log("------ Logs 👇 ------");
+          console.log(error.logs.join("\n"));
+          const errorParsed = parseErrorFromLogs(error.logs, this.config.programId);
+          console.log("Parsed:", errorParsed);
+          throw new ProcessTransactionError(
+            errorParsed?.description ?? error.message,
+            ProcessTransactionErrorType.SimulationError,
+            error.logs
+          );
+        }
+      }
+      console.log("fallthrough error", error);
+      throw new ProcessTransactionError(error.message, ProcessTransactionErrorType.FallthroughError);
     }
   }
 
