@@ -550,8 +550,7 @@ class MarginfiClient {
                     console.log("[DONE skipPreflightInSpam]");
                 }
                 while (true) {
-                    const mrgnRPC = new web3_js_1.Connection('https://mrgn.rpcpool.com/c293bade994b3864b52c6bbbba4b');
-                    signature = await mrgnRPC.sendTransaction(versionedTransaction, {
+                    signature = await sendConnection.sendTransaction(versionedTransaction, {
                         // minContextSlot: mergedOpts.minContextSlot,
                         // skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
                         skipPreflight: true,
@@ -568,9 +567,7 @@ class MarginfiClient {
                             status = "processed";
                             break;
                         }
-                        console.time("i");
                         await (0, mrgn_common_1.sleep)(400); // sleep for 400ms
-                        console.timeEnd("i");
                     } // 1 loop time is 400 * 4 = 800s
                     let blockHeight = await connection.getBlockHeight();
                     if (blockHeight > lastValidBlockHeight) {
