@@ -414,25 +414,26 @@ class MarginfiClient {
                     ...opts,
                 };
                 if (this.spamSendTx) {
+                    console.log("[in spamSendTx]");
                     let status = "pending";
                     if (this.skipPreflightInSpam) {
+                        console.log("[in skipPreflightInSpam]");
                         const response = await connection.simulateTransaction(versionedTransaction, opts ?? { minContextSlot, sigVerify: false });
                         if (response.value.err)
                             throw new web3_js_1.SendTransactionError(JSON.stringify(response.value.err), response.value.logs ?? []);
                     }
                     while (true) {
                         signature = await sendConnection.sendTransaction(versionedTransaction, {
-                            // minContextSlot: mergedOpts.minContextSlot,
-                            skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
-                            preflightCommitment: mergedOpts.preflightCommitment,
-                            maxRetries: mergedOpts.maxRetries,
+                            // skipPreflight: false,
+                            // preflightCommitment: 'finalized',
+                            maxRetries: 0
                         });
                         for (let i = 0; i < 5; i++) {
                             const signatureStatus = await connection.getSignatureStatus(signature, {
                                 searchTransactionHistory: false,
                             });
-                            if (signatureStatus.value?.confirmationStatus === "confirmed") {
-                                status = "confirmed";
+                            if (signatureStatus.value?.confirmationStatus === 'finalized') {
+                                status = "finalized";
                                 break;
                             }
                             await (0, mrgn_common_1.sleep)(200);
@@ -441,7 +442,7 @@ class MarginfiClient {
                         if (blockHeight > lastValidBlockHeight) {
                             throw new errors_1.ProcessTransactionError("Transaction was not confirmed within †he alloted time", errors_1.ProcessTransactionErrorType.TimeoutError);
                         }
-                        if (status === "confirmed") {
+                        if (status === "finalized") {
                             break;
                         }
                     }
@@ -457,7 +458,7 @@ class MarginfiClient {
                         blockhash,
                         lastValidBlockHeight,
                         signature,
-                    }, mergedOpts.commitment);
+                    }, 'finalized');
                 }
                 return signature;
             }
@@ -532,51 +533,67 @@ class MarginfiClient {
                 minContextSlot,
                 ...opts,
             };
+            console.log(`mergedOpts :: ${JSON.stringify(mergedOpts)}`);
             if (this.spamSendTx) {
+                console.log("[in spamSendTx]");
                 let status = "pending";
                 if (this.skipPreflightInSpam) {
+                    console.log("[in skipPreflightInSpam]");
                     const response = await connection.simulateTransaction(versionedTransaction, opts ?? { minContextSlot, sigVerify: false });
-                    if (response.value.err)
+                    if (response.value.err) {
+                        console.log("error while simulation");
                         throw new web3_js_1.SendTransactionError(JSON.stringify(response.value.err), response.value.logs ?? []);
+                    }
+                    else {
+                        console.log(response.value.logs);
+                    }
+                    console.log("[DONE skipPreflightInSpam]");
                 }
                 while (true) {
-                    signature = await sendConnection.sendTransaction(versionedTransaction, {
+                    const mrgnRPC = new web3_js_1.Connection('https://mrgn.rpcpool.com/c293bade994b3864b52c6bbbba4b');
+                    signature = await mrgnRPC.sendTransaction(versionedTransaction, {
                         // minContextSlot: mergedOpts.minContextSlot,
-                        skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
-                        preflightCommitment: mergedOpts.preflightCommitment,
-                        maxRetries: mergedOpts.maxRetries,
+                        // skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
+                        skipPreflight: true,
+                        // preflightCommitment: 'processed',
+                        maxRetries: 0,
                     });
+                    console.log("transcation sent.", signature);
                     for (let i = 0; i < 5; i++) {
                         const signatureStatus = await connection.getSignatureStatus(signature, {
                             searchTransactionHistory: false,
                         });
-                        if (signatureStatus.value?.confirmationStatus === "confirmed") {
-                            status = "confirmed";
+                        console.log("signatureStatus", signatureStatus.value);
+                        if (signatureStatus.value?.confirmationStatus === 'processed' || signatureStatus.value?.confirmationStatus === 'confirmed' || signatureStatus.value?.confirmationStatus === 'finalized') {
+                            status = "processed";
                             break;
                         }
-                        await (0, mrgn_common_1.sleep)(200);
-                    }
+                        console.time("i");
+                        await (0, mrgn_common_1.sleep)(400); // sleep for 400ms
+                        console.timeEnd("i");
+                    } // 1 loop time is 400 * 4 = 800s
                     let blockHeight = await connection.getBlockHeight();
                     if (blockHeight > lastValidBlockHeight) {
                         throw new errors_1.ProcessTransactionError("Transaction was not confirmed within †he alloted time", errors_1.ProcessTransactionErrorType.TimeoutError);
                     }
-                    if (status === "confirmed") {
+                    if (status === "processed") {
                         break;
                     }
                 }
             }
             else {
+                console.log("[Standerd sendTransaction]");
                 signature = await connection.sendTransaction(versionedTransaction, {
-                    // minContextSlot: mergedOpts.minContextSlot,
-                    skipPreflight: mergedOpts.skipPreflight,
-                    preflightCommitment: mergedOpts.preflightCommitment,
-                    maxRetries: mergedOpts.maxRetries,
+                    // skipPreflight: true,
+                    preflightCommitment: 'processed',
+                    // maxRetries: mergedOpts.maxRetries, // if none, RPC will keep re-trying
                 });
+                console.log("Confirming Transaction ... ");
                 await connection.confirmTransaction({
                     blockhash,
                     lastValidBlockHeight,
                     signature,
-                }, mergedOpts.commitment);
+                }, 'processed');
             }
             return signature;
         }

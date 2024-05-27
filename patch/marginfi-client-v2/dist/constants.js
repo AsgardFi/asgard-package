@@ -17,7 +17,11 @@ exports.SWB_PRICE_CONF_INTERVALS = new bignumber_js_1.default(1.96);
 exports.MAX_CONFIDENCE_INTERVAL_RATIO = new bignumber_js_1.default(0.05);
 exports.USDC_DECIMALS = 6;
 exports.ADDRESS_LOOKUP_TABLE_FOR_GROUP = {
-    "4qp6Fx6tnZkY5Wropq9wUYgtFxXKwE6viZxFHg3rdAG8": [new web3_js_1.PublicKey("2FyGQ8UZ6PegCSN2Lu7QD1U2UY28GpJdDfdwEfbwxN7p")],
+    "4qp6Fx6tnZkY5Wropq9wUYgtFxXKwE6viZxFHg3rdAG8": [
+        // new PublicKey("2FyGQ8UZ6PegCSN2Lu7QD1U2UY28GpJdDfdwEfbwxN7p"),
+        new web3_js_1.PublicKey("HGmknUTUmeovMc9ryERNWG6UFZDFDVr9xrum3ZhyL4fC"),
+        new web3_js_1.PublicKey("5FuKF7C1tJji2mXZuJ14U9oDb37is5mmvYLf4KwojoF1"),
+    ],
 };
 exports.DISABLED_FLAG = 1 << 0;
 exports.FLASHLOAN_ENABLED_FLAG = 1 << 2;

@@ -12,7 +12,7 @@ export declare const SWB_PRICE_CONF_INTERVALS: BigNumber;
 export declare const MAX_CONFIDENCE_INTERVAL_RATIO: BigNumber;
 export declare const USDC_DECIMALS = 6;
 export declare const ADDRESS_LOOKUP_TABLE_FOR_GROUP: {
-    [key: string]: [PublicKey];
+    [key: string]: PublicKey[];
 };
 export declare const DISABLED_FLAG: number;
 export declare const FLASHLOAN_ENABLED_FLAG: number;

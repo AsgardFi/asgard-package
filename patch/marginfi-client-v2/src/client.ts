@@ -615,8 +615,10 @@ class MarginfiClient {
         };
 
         if (this.spamSendTx) {
+          console.log("[in spamSendTx]")
           let status = "pending";
           if (this.skipPreflightInSpam) {
+            console.log("[in skipPreflightInSpam]")
             const response = await connection.simulateTransaction(
               versionedTransaction,
               opts ?? { minContextSlot, sigVerify: false }
@@ -627,17 +629,16 @@ class MarginfiClient {
 
           while (true) {
             signature = await sendConnection.sendTransaction(versionedTransaction, {
-              // minContextSlot: mergedOpts.minContextSlot,
-              skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
-              preflightCommitment: mergedOpts.preflightCommitment,
-              maxRetries: mergedOpts.maxRetries,
+              // skipPreflight: false,
+              // preflightCommitment: 'finalized',
+              maxRetries: 0
             });
             for (let i = 0; i < 5; i++) {
               const signatureStatus = await connection.getSignatureStatus(signature, {
                 searchTransactionHistory: false,
               });
-              if (signatureStatus.value?.confirmationStatus === "confirmed") {
-                status = "confirmed";
+              if (signatureStatus.value?.confirmationStatus === 'finalized') {
+                status = "finalized";
                 break;
               }
               await sleep(200);
@@ -651,7 +652,7 @@ class MarginfiClient {
               );
             }
 
-            if (status === "confirmed") {
+            if (status === "finalized") {
               break;
             }
           }
@@ -668,7 +669,7 @@ class MarginfiClient {
               lastValidBlockHeight,
               signature,
             },
-            mergedOpts.commitment
+            'finalized'
           );
         }
 
@@ -776,34 +777,51 @@ class MarginfiClient {
         ...opts,
       };
 
+      console.log(`mergedOpts :: ${JSON.stringify(mergedOpts)}`)
+
       if (this.spamSendTx) {
+        console.log("[in spamSendTx]")
         let status = "pending";
+
         if (this.skipPreflightInSpam) {
+          console.log("[in skipPreflightInSpam]")
+
           const response = await connection.simulateTransaction(
             versionedTransaction,
             opts ?? { minContextSlot, sigVerify: false }
           );
-          if (response.value.err)
+          
+          if (response.value.err) {
+            console.log("error while simulation")
             throw new SendTransactionError(JSON.stringify(response.value.err), response.value.logs ?? []);
+          } else {
+          console.log(response.value.logs);
+          }
+          console.log("[DONE skipPreflightInSpam]")
         }
 
         while (true) {
           signature = await sendConnection.sendTransaction(versionedTransaction, {
             // minContextSlot: mergedOpts.minContextSlot,
-            skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
-            preflightCommitment: mergedOpts.preflightCommitment,
-            maxRetries: mergedOpts.maxRetries,
+            // skipPreflight: this.skipPreflightInSpam || mergedOpts.skipPreflight,
+            skipPreflight: true,
+            // preflightCommitment: 'processed',
+            maxRetries: 0,
           });
+          console.log("transcation sent.", signature)
+
           for (let i = 0; i < 5; i++) {
             const signatureStatus = await connection.getSignatureStatus(signature, {
               searchTransactionHistory: false,
             });
-            if (signatureStatus.value?.confirmationStatus === "confirmed") {
-              status = "confirmed";
+            console.log("signatureStatus", signatureStatus.value)
+
+            if (signatureStatus.value?.confirmationStatus === 'processed' || signatureStatus.value?.confirmationStatus === 'confirmed' || signatureStatus.value?.confirmationStatus === 'finalized') {
+              status = "processed";
               break;
             }
-            await sleep(200);
-          }
+            await sleep(400); // sleep for 400ms
+          } // 1 loop time is 400 * 4 = 800s
 
           let blockHeight = await connection.getBlockHeight();
           if (blockHeight > lastValidBlockHeight) {
@@ -813,24 +831,27 @@ class MarginfiClient {
             );
           }
 
-          if (status === "confirmed") {
+          if (status === "processed") {
             break;
           }
         }
       } else {
+        console.log("[Standerd sendTransaction]");
+        
         signature = await connection.sendTransaction(versionedTransaction, {
-          // minContextSlot: mergedOpts.minContextSlot,
-          skipPreflight: mergedOpts.skipPreflight,
-          preflightCommitment: mergedOpts.preflightCommitment,
-          maxRetries: mergedOpts.maxRetries,
+          // skipPreflight: true,
+          preflightCommitment: 'processed',
+          // maxRetries: mergedOpts.maxRetries, // if none, RPC will keep re-trying
         });
+
+        console.log("Confirming Transaction ... ");
         await connection.confirmTransaction(
           {
             blockhash,
             lastValidBlockHeight,
             signature,
           },
-          mergedOpts.commitment
+          'processed'
         );
       }
 

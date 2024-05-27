@@ -631,6 +631,8 @@ class MarginfiAccountWrapper {
     const ixs = [...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
 
     const { blockhash } = await this._program.provider.connection.getLatestBlockhash();
+    console.log(`blockhash :: ${blockhash}`)
+
     const message = new TransactionMessage({
       payerKey: this.client.wallet.publicKey,
       recentBlockhash: blockhash,
@@ -642,7 +644,6 @@ class MarginfiAccountWrapper {
     if (args.signers) {
       tx.sign(args.signers);
     }
-
     return tx;
   }
 

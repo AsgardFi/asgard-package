@@ -339,6 +339,7 @@ class MarginfiAccountWrapper {
         const endFlashLoanIx = await this.makeEndFlashLoanIx(projectedActiveBalances);
         const ixs = [...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
         const { blockhash } = await this._program.provider.connection.getLatestBlockhash();
+        console.log(`blockhash :: ${blockhash}`);
         const message = new web3_js_1.TransactionMessage({
             payerKey: this.client.wallet.publicKey,
             recentBlockhash: blockhash,
