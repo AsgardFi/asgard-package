@@ -647,6 +647,43 @@ class MarginfiAccountWrapper {
     return tx;
   }
 
+  public async buildFlashLoanTxV0(
+    args: FlashLoanArgs,
+    lookupTables?: AddressLookupTableAccount[]
+  ): Promise<Transaction> {
+    const endIndex = args.ixs.length + 1;
+
+    const projectedActiveBalances: PublicKey[] = this._marginfiAccount.projectActiveBalancesNoCpi(
+      this._program,
+      args.ixs
+    );
+
+    const beginFlashLoanIx = await this.makeBeginFlashLoanIx(endIndex);
+    const endFlashLoanIx = await this.makeEndFlashLoanIx(projectedActiveBalances);
+
+    const ixs = [...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
+
+    // const { blockhash } = await this._program.provider.connection.getLatestBlockhash();
+    // console.log(`blockhash :: ${blockhash}`)
+
+    const ftx = new Transaction()
+    ftx.add(...ixs)
+
+    // const message = new TransactionMessage({
+    //   payerKey: this.client.wallet.publicKey,
+    //   recentBlockhash: blockhash,
+    //   instructions: ixs,
+    // }).compileToV0Message([...(lookupTables ?? []), ...(args.addressLookupTableAccounts ?? [])]);
+
+    
+
+    // const tx = new VersionedTransaction(message);
+
+    // if (args.signers) {
+    //   tx.sign(args.signers);
+    // }
+    return ftx;
+  }
   public async makeTransferAccountAuthorityIx(newAccountAuthority: PublicKey): Promise<InstructionsWrapper> {
     return this._marginfiAccount.makeAccountAuthorityTransferIx(this._program, newAccountAuthority);
   }

@@ -3,12 +3,15 @@ import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import {
   AddressLookupTableAccount,
   Commitment,
+  ComputeBudgetProgram,
   ConfirmOptions,
   Connection,
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SendTransactionError,
   Signer,
+  SystemProgram,
   Transaction,
   TransactionMessage,
   TransactionSignature,
@@ -43,6 +46,7 @@ import {
 } from ".";
 import { MarginfiAccountWrapper } from "./models/account/wrapper";
 import { ProcessTransactionError, ProcessTransactionErrorType, parseErrorFromLogs } from "./errors";
+import axios from "axios";
 
 export type BankMap = Map<string, Bank>;
 export type OraclePriceMap = Map<string, OraclePrice>;
@@ -698,53 +702,53 @@ class MarginfiClient {
     transaction: Transaction | VersionedTransaction,
     signers?: Array<Signer>,
     connectionArgs?: Connection
-): Promise<VersionedTransaction> {
+  ): Promise<VersionedTransaction> {
 
-    const connection = connectionArgs 
-        ? connectionArgs 
-        : new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
+    const connection = connectionArgs
+      ? connectionArgs
+      : new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
 
     let versionedTransaction: VersionedTransaction;
     let blockhash: string;
 
     try {
-        const { value: { blockhash: latestBlockhash } } = await connection.getLatestBlockhashAndContext();
-        blockhash = latestBlockhash;
+      const { value: { blockhash: latestBlockhash } } = await connection.getLatestBlockhashAndContext();
+      blockhash = latestBlockhash;
 
-        if (transaction instanceof Transaction) {
-            const versionedMessage = new TransactionMessage({
-                instructions: transaction.instructions,
-                payerKey: this.provider.publicKey,
-                recentBlockhash: blockhash,
-            });
+      if (transaction instanceof Transaction) {
+        const versionedMessage = new TransactionMessage({
+          instructions: transaction.instructions,
+          payerKey: this.provider.publicKey,
+          recentBlockhash: blockhash,
+        });
 
-            versionedTransaction = new VersionedTransaction(
-                versionedMessage.compileToV0Message(this.addressLookupTables)
-            );
-        } else {
-            versionedTransaction = transaction;
-        }
-
-        if (signers) {
-            versionedTransaction.sign(signers);
-        }
-    } catch (error: any) {
-        console.error("Failed to build the transaction", error);
-        throw new ProcessTransactionError(
-            error.message, 
-            ProcessTransactionErrorType.TransactionBuildingError
+        versionedTransaction = new VersionedTransaction(
+          versionedMessage.compileToV0Message(this.addressLookupTables)
         );
+      } else {
+        versionedTransaction = transaction;
+      }
+
+      if (signers) {
+        versionedTransaction.sign(signers);
+      }
+    } catch (error: any) {
+      console.error("Failed to build the transaction", error);
+      throw new ProcessTransactionError(
+        error.message,
+        ProcessTransactionErrorType.TransactionBuildingError
+      );
     }
 
     try {
-        versionedTransaction = await this.wallet.signTransaction(versionedTransaction);
-        return versionedTransaction;
+      versionedTransaction = await this.wallet.signTransaction(versionedTransaction);
+      return versionedTransaction;
     } catch (error: any) {
-        console.error("Failed to sign the transaction", error);
-        throw new ProcessTransactionError(
-          error.message, 
-            ProcessTransactionErrorType.FallthroughError
-        );
+      console.error("Failed to sign the transaction", error);
+      throw new ProcessTransactionError(
+        error.message,
+        ProcessTransactionErrorType.FallthroughError
+      );
     }
   }
 
@@ -753,10 +757,10 @@ class MarginfiClient {
     opts?: TransactionOptions,
     connectionArgs?: Connection
   ): Promise<TransactionSignature> {
-    
+
     const connection = connectionArgs ?? new Connection(this.provider.connection.rpcEndpoint, this.provider.opts);
     const sendConnection = this.sendEndpoint ? new Connection(this.sendEndpoint, this.provider.opts) : connection;
-    
+
     let signature: TransactionSignature = "";
     let minContextSlot: number;
     let blockhash: string;
@@ -790,12 +794,12 @@ class MarginfiClient {
             versionedTransaction,
             opts ?? { minContextSlot, sigVerify: false }
           );
-          
+
           if (response.value.err) {
             console.log("error while simulation")
             throw new SendTransactionError(JSON.stringify(response.value.err), response.value.logs ?? []);
           } else {
-          console.log(response.value.logs);
+            console.log(response.value.logs);
           }
           console.log("[DONE skipPreflightInSpam]")
         }
@@ -837,7 +841,7 @@ class MarginfiClient {
         }
       } else {
         console.log("[Standerd sendTransaction]");
-        
+
         signature = await connection.sendTransaction(versionedTransaction, {
           // skipPreflight: true,
           preflightCommitment: 'processed',
@@ -873,6 +877,161 @@ class MarginfiClient {
       console.log("fallthrough error", error);
       throw new ProcessTransactionError(error.message, ProcessTransactionErrorType.FallthroughError);
     }
+  }
+
+  async processTrancationJito(
+    jitoTip: number, // in ui
+    tx: Transaction,
+    luts?: AddressLookupTableAccount[],
+    priorityFee?: number, // priorityFeeUi
+  ) {
+
+    console.log(`this.provider.connection.commitment :: ${this.provider.connection.commitment}`);
+    const jitoTipInLamport = jitoTip * LAMPORTS_PER_SOL;
+    console.log(`jitoTipInLamport :: ${jitoTipInLamport}`)
+
+    if (jitoTip == 0) {
+      throw Error("Jito bundle tip has not been set.");
+    }
+
+    // if (priorityFee) {
+    //   const priorityFeeMicroLamports = priorityFee * LAMPORTS_PER_SOL * 1_000_000;
+    //   console.log(`priorityFeeMicroLamports :: ${priorityFeeMicroLamports}`)
+
+    //   tx.instructions.unshift(
+    //     ComputeBudgetProgram.setComputeUnitPrice({
+    //       microLamports: Math.round(priorityFeeMicroLamports),
+    //     })
+    //   );
+    // }
+
+    // https://jito-foundation.gitbook.io/mev/mev-payment-and-distribution/on-chain-addresses
+    tx.instructions.push(
+      SystemProgram.transfer({
+        fromPubkey: this.provider.publicKey,
+        toPubkey: new PublicKey(
+          "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL" // Jito tip account
+        ),
+        lamports: jitoTipInLamport, // tip
+      })
+    );
+
+    const recentBlockhash = await this.provider.connection.getLatestBlockhash();
+    console.log(`recentBlockhash :: ${recentBlockhash.blockhash}`)
+
+    let vTx: VersionedTransaction = new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: this.provider.publicKey,
+        recentBlockhash: recentBlockhash.blockhash,
+        instructions: tx.instructions,
+      }).compileToV0Message([...(luts ?? [])])
+    );
+
+    const totalSize = vTx.message.serialize().length;
+    const totalKeys = vTx.message.getAccountKeys({ addressLookupTableAccounts: luts }).length;
+    console.log(`tx totalSize :: ${totalSize}`)
+    console.log(`tx totalKeys :: ${totalKeys}`)
+
+
+    if (totalSize > 1232 || totalKeys >= 64) {
+      console.log("tx size is too big")
+      return false
+    }
+
+
+    // Time to simulate the tx
+    try {
+      const txSim = await this.provider.connection.simulateTransaction(vTx, {sigVerify: false,})
+          
+        console.log(txSim.value.logs);
+
+    } catch (error: any) {
+      if (error instanceof SendTransactionError) {
+        if (error.logs) {
+          console.log("------ Logs 👇 ------");
+          console.log(error.logs.join("\n"));
+          const errorParsed = parseErrorFromLogs(error.logs, this.config.programId);
+          console.log("Parsed:", errorParsed);
+          throw new ProcessTransactionError(
+            errorParsed?.description ?? error.message,
+            ProcessTransactionErrorType.SimulationError,
+            error.logs
+          );
+        }
+      }
+      console.log("fallthrough error", error);
+      throw new ProcessTransactionError(error.message, ProcessTransactionErrorType.FallthroughError);
+    }
+
+
+    vTx = (await this.wallet.signTransaction(vTx)) as VersionedTransaction;
+
+    let rawTx = vTx.serialize();
+
+    const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
+    console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
+
+    // console.log(this.provider.connection.simulateTransaction(vTx))
+
+
+    const encodedTx = bs58.encode(rawTx);
+    const jitoURL = "https://mainnet.block-engine.jito.wtf/api/v1/transactions";
+    const payload = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "sendTransaction",
+      params: [encodedTx, {
+        "maxRetries": 0,
+        "skipPreflight": true,
+        "preflightCommitment": "processed"
+      }],
+    };
+    // let txOpts = commitmentConfig(provider.connection.commitment);
+    let txSig: string;
+
+    try {
+      const response = await axios.post(jitoURL, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
+      console.log(`JitoResponse :: ${JSON.stringify(response.data)}`)
+
+      txSig = response.data.result;
+      console.log(`txSig :: ${txSig}`)
+    } catch (error) {
+      console.error("Error:", error);
+      throw new Error("Jito Bundle Error: cannot send.");
+    }
+
+    let currentBlockHeight = await this.provider.connection.getBlockHeight(
+      this.provider.connection.commitment
+    );
+
+    while (currentBlockHeight < recentBlockhash.lastValidBlockHeight) {
+      // Keep resending to maximise the chance of confirmation
+      const txSigHash = await this.provider.connection.sendRawTransaction(rawTx, {
+        skipPreflight: true,
+        preflightCommitment: this.provider.connection.commitment,
+        maxRetries: 0,
+      });
+      console.log(txSigHash)
+
+      let signatureStatus = await this.provider.connection.getSignatureStatus(txSig);
+      console.log("signatureStatus", signatureStatus.value)
+
+      currentBlockHeight = await this.provider.connection.getBlockHeight(
+        this.provider.connection.commitment
+      );
+
+      if (signatureStatus.value != null) {
+        if (
+          signatureStatus.value?.confirmationStatus === 'processed' || signatureStatus.value?.confirmationStatus === 'confirmed' || signatureStatus.value?.confirmationStatus === 'finalized'
+        ) {
+          return txSig;
+        }
+      }
+      await sleep(500); // Don't spam the RPC
+    }
+    throw Error(`Transaction ${txSig} was not confirmed`);
   }
 
   async simulateTransaction(

@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { Amount, InstructionsWrapper } from "@mrgnlabs/mrgn-common";
 import { Address } from "@coral-xyz/anchor";
-import { AccountMeta, Commitment, PublicKey, TransactionInstruction, Signer, AddressLookupTableAccount, VersionedTransaction } from "@solana/web3.js";
+import { AccountMeta, Commitment, PublicKey, Transaction, TransactionInstruction, Signer, AddressLookupTableAccount, VersionedTransaction } from "@solana/web3.js";
 import BigNumber from "bignumber.js";
 import { MarginfiClient, MarginfiGroup } from "../..";
 import { MarginfiAccount, MarginRequirementType, MarginfiAccountRaw } from "./pure";
@@ -91,6 +91,7 @@ declare class MarginfiAccountWrapper {
     makeEndFlashLoanIx(projectedActiveBalances: PublicKey[]): Promise<InstructionsWrapper>;
     flashLoan(args: FlashLoanArgs): Promise<string>;
     buildFlashLoanTx(args: FlashLoanArgs, lookupTables?: AddressLookupTableAccount[]): Promise<VersionedTransaction>;
+    buildFlashLoanTxV0(args: FlashLoanArgs, lookupTables?: AddressLookupTableAccount[]): Promise<Transaction>;
     makeTransferAccountAuthorityIx(newAccountAuthority: PublicKey): Promise<InstructionsWrapper>;
     transferAccountAuthority(newAccountAuthority: PublicKey): Promise<string>;
     getHealthCheckAccounts(mandatoryBanks?: Bank[], excludedBanks?: Bank[]): AccountMeta[];

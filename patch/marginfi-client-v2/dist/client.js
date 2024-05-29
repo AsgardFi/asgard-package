@@ -16,6 +16,7 @@ const group_1 = require("./models/group");
 const _1 = require(".");
 const wrapper_1 = require("./models/account/wrapper");
 const errors_1 = require("./errors");
+const axios_1 = __importDefault(require("axios"));
 /**
  * Entrypoint to interact with the marginfi contract.
  */
@@ -607,6 +608,115 @@ class MarginfiClient {
             console.log("fallthrough error", error);
             throw new errors_1.ProcessTransactionError(error.message, errors_1.ProcessTransactionErrorType.FallthroughError);
         }
+    }
+    async processTrancationJito(jitoTip, // in ui
+    tx, luts, priorityFee) {
+        console.log(`this.provider.connection.commitment :: ${this.provider.connection.commitment}`);
+        const jitoTipInLamport = jitoTip * web3_js_1.LAMPORTS_PER_SOL;
+        console.log(`jitoTipInLamport :: ${jitoTipInLamport}`);
+        if (jitoTip == 0) {
+            throw Error("Jito bundle tip has not been set.");
+        }
+        // if (priorityFee) {
+        //   const priorityFeeMicroLamports = priorityFee * LAMPORTS_PER_SOL * 1_000_000;
+        //   console.log(`priorityFeeMicroLamports :: ${priorityFeeMicroLamports}`)
+        //   tx.instructions.unshift(
+        //     ComputeBudgetProgram.setComputeUnitPrice({
+        //       microLamports: Math.round(priorityFeeMicroLamports),
+        //     })
+        //   );
+        // }
+        // https://jito-foundation.gitbook.io/mev/mev-payment-and-distribution/on-chain-addresses
+        tx.instructions.push(web3_js_1.SystemProgram.transfer({
+            fromPubkey: this.provider.publicKey,
+            toPubkey: new web3_js_1.PublicKey("DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL" // Jito tip account
+            ),
+            lamports: jitoTipInLamport, // tip
+        }));
+        const recentBlockhash = await this.provider.connection.getLatestBlockhash();
+        console.log(`recentBlockhash :: ${recentBlockhash.blockhash}`);
+        let vTx = new web3_js_1.VersionedTransaction(new web3_js_1.TransactionMessage({
+            payerKey: this.provider.publicKey,
+            recentBlockhash: recentBlockhash.blockhash,
+            instructions: tx.instructions,
+        }).compileToV0Message([...(luts ?? [])]));
+        const totalSize = vTx.message.serialize().length;
+        const totalKeys = vTx.message.getAccountKeys({ addressLookupTableAccounts: luts }).length;
+        console.log(`tx totalSize :: ${totalSize}`);
+        console.log(`tx totalKeys :: ${totalKeys}`);
+        if (totalSize > 1232 || totalKeys >= 64) {
+            console.log("tx size is too big");
+            return false;
+        }
+        // Time to simulate the tx
+        try {
+            const txSim = await this.provider.connection.simulateTransaction(vTx, { sigVerify: false, });
+            console.log(txSim.value.logs);
+        }
+        catch (error) {
+            if (error instanceof web3_js_1.SendTransactionError) {
+                if (error.logs) {
+                    console.log("------ Logs 👇 ------");
+                    console.log(error.logs.join("\n"));
+                    const errorParsed = (0, errors_1.parseErrorFromLogs)(error.logs, this.config.programId);
+                    console.log("Parsed:", errorParsed);
+                    throw new errors_1.ProcessTransactionError(errorParsed?.description ?? error.message, errors_1.ProcessTransactionErrorType.SimulationError, error.logs);
+                }
+            }
+            console.log("fallthrough error", error);
+            throw new errors_1.ProcessTransactionError(error.message, errors_1.ProcessTransactionErrorType.FallthroughError);
+        }
+        vTx = (await this.wallet.signTransaction(vTx));
+        let rawTx = vTx.serialize();
+        const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
+        console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
+        // console.log(this.provider.connection.simulateTransaction(vTx))
+        const encodedTx = bytes_1.bs58.encode(rawTx);
+        const jitoURL = "https://mainnet.block-engine.jito.wtf/api/v1/transactions";
+        const payload = {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "sendTransaction",
+            params: [encodedTx, {
+                    "maxRetries": 0,
+                    "skipPreflight": true,
+                    "preflightCommitment": "processed"
+                }],
+        };
+        // let txOpts = commitmentConfig(provider.connection.commitment);
+        let txSig;
+        try {
+            const response = await axios_1.default.post(jitoURL, payload, {
+                headers: { "Content-Type": "application/json" },
+            });
+            console.log(`JitoResponse :: ${JSON.stringify(response.data)}`);
+            txSig = response.data.result;
+            console.log(`txSig :: ${txSig}`);
+        }
+        catch (error) {
+            console.error("Error:", error);
+            throw new Error("Jito Bundle Error: cannot send.");
+        }
+        let currentBlockHeight = await this.provider.connection.getBlockHeight(this.provider.connection.commitment);
+        while (currentBlockHeight < recentBlockhash.lastValidBlockHeight) {
+            // Keep resending to maximise the chance of confirmation
+            const txSigHash = await this.provider.connection.sendRawTransaction(rawTx, {
+                skipPreflight: true,
+                preflightCommitment: this.provider.connection.commitment,
+                maxRetries: 0,
+            });
+            console.log(txSigHash);
+            let signatureStatus = await this.provider.connection.getSignatureStatus(txSig);
+            console.log("signatureStatus", signatureStatus.value);
+            currentBlockHeight = await this.provider.connection.getBlockHeight(this.provider.connection.commitment);
+            if (signatureStatus.value != null) {
+                if (signatureStatus.value?.confirmationStatus === 'processed' || signatureStatus.value?.confirmationStatus === 'confirmed' || signatureStatus.value?.confirmationStatus === 'finalized') {
+                    return txSig;
+                }
+            }
+            await (0, mrgn_common_1.sleep)(500); // Don't spam the RPC
+        }
+        throw Error(`Transaction ${txSig} was not confirmed`);
     }
     async simulateTransaction(transaction, accountsToInspect) {
         let versionedTransaction;
