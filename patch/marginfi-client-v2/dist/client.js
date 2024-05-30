@@ -609,7 +609,7 @@ class MarginfiClient {
             throw new errors_1.ProcessTransactionError(error.message, errors_1.ProcessTransactionErrorType.FallthroughError);
         }
     }
-    async processTrancationJito(jitoTip, // in ui
+    async signTranscationJito(jitoTip, // in ui
     tx, luts, priorityFee) {
         console.log(`this.provider.connection.commitment :: ${this.provider.connection.commitment}`);
         const jitoTipInLamport = jitoTip * web3_js_1.LAMPORTS_PER_SOL;
@@ -617,15 +617,13 @@ class MarginfiClient {
         if (jitoTip == 0) {
             throw Error("Jito bundle tip has not been set.");
         }
-        // if (priorityFee) {
-        //   const priorityFeeMicroLamports = priorityFee * LAMPORTS_PER_SOL * 1_000_000;
-        //   console.log(`priorityFeeMicroLamports :: ${priorityFeeMicroLamports}`)
-        //   tx.instructions.unshift(
-        //     ComputeBudgetProgram.setComputeUnitPrice({
-        //       microLamports: Math.round(priorityFeeMicroLamports),
-        //     })
-        //   );
-        // }
+        if (priorityFee) {
+            const priorityFeeMicroLamports = priorityFee * web3_js_1.LAMPORTS_PER_SOL * 1000000;
+            console.log(`priorityFeeMicroLamports :: ${priorityFeeMicroLamports}`);
+            tx.instructions.unshift(web3_js_1.ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: Math.round(priorityFeeMicroLamports),
+            }));
+        }
         // https://jito-foundation.gitbook.io/mev/mev-payment-and-distribution/on-chain-addresses
         tx.instructions.push(web3_js_1.SystemProgram.transfer({
             fromPubkey: this.provider.publicKey,
@@ -633,13 +631,15 @@ class MarginfiClient {
             ),
             lamports: jitoTipInLamport, // tip
         }));
-        const recentBlockhash = await this.provider.connection.getLatestBlockhash();
-        console.log(`recentBlockhash :: ${recentBlockhash.blockhash}`);
+        const getLatestBlockhashAndContext = await this.provider.connection.getLatestBlockhashAndContext();
+        const minContextSlot = getLatestBlockhashAndContext.context.slot - 4;
+        const recentBlockhash = getLatestBlockhashAndContext.value.blockhash;
         let vTx = new web3_js_1.VersionedTransaction(new web3_js_1.TransactionMessage({
             payerKey: this.provider.publicKey,
-            recentBlockhash: recentBlockhash.blockhash,
+            recentBlockhash: recentBlockhash,
             instructions: tx.instructions,
         }).compileToV0Message([...(luts ?? [])]));
+        // Verify txSize limits
         const totalSize = vTx.message.serialize().length;
         const totalKeys = vTx.message.getAccountKeys({ addressLookupTableAccounts: luts }).length;
         console.log(`tx totalSize :: ${totalSize}`);
@@ -650,7 +650,7 @@ class MarginfiClient {
         }
         // Time to simulate the tx
         try {
-            const txSim = await this.provider.connection.simulateTransaction(vTx, { sigVerify: false, });
+            const txSim = await this.provider.connection.simulateTransaction(vTx, { minContextSlot, sigVerify: false, });
             console.log(txSim.value.logs);
         }
         catch (error) {
@@ -666,11 +666,20 @@ class MarginfiClient {
             console.log("fallthrough error", error);
             throw new errors_1.ProcessTransactionError(error.message, errors_1.ProcessTransactionErrorType.FallthroughError);
         }
-        vTx = (await this.wallet.signTransaction(vTx));
-        let rawTx = vTx.serialize();
-        const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
-        console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
-        // console.log(this.provider.connection.simulateTransaction(vTx))
+        try {
+            vTx = (await this.wallet.signTransaction(vTx));
+            const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
+            console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
+            return vTx;
+        }
+        catch (error) {
+            console.error("Failed to sign the transaction", error);
+            throw new errors_1.ProcessTransactionError(error.message, errors_1.ProcessTransactionErrorType.FallthroughError);
+        }
+    }
+    async sendAndConfirmTrancationJito(tx) {
+        let rawTx = tx.serialize();
+        const recentBlockhash = await this.provider.connection.getLatestBlockhash();
         const encodedTx = bytes_1.bs58.encode(rawTx);
         const jitoURL = "https://mainnet.block-engine.jito.wtf/api/v1/transactions";
         const payload = {

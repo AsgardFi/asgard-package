@@ -651,6 +651,7 @@ class MarginfiAccountWrapper {
     args: FlashLoanArgs,
     lookupTables?: AddressLookupTableAccount[]
   ): Promise<Transaction> {
+    console.log("buildFlashLoanTxV0")
     const endIndex = args.ixs.length + 1;
 
     const projectedActiveBalances: PublicKey[] = this._marginfiAccount.projectActiveBalancesNoCpi(

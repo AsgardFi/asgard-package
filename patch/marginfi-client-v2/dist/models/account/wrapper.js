@@ -352,6 +352,7 @@ class MarginfiAccountWrapper {
         return tx;
     }
     async buildFlashLoanTxV0(args, lookupTables) {
+        console.log("buildFlashLoanTxV0");
         const endIndex = args.ixs.length + 1;
         const projectedActiveBalances = this._marginfiAccount.projectActiveBalancesNoCpi(this._program, args.ixs);
         const beginFlashLoanIx = await this.makeBeginFlashLoanIx(endIndex);

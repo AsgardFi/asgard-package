@@ -879,13 +879,12 @@ class MarginfiClient {
     }
   }
 
-  async processTrancationJito(
+  async signTranscationJito(
     jitoTip: number, // in ui
     tx: Transaction,
     luts?: AddressLookupTableAccount[],
     priorityFee?: number, // priorityFeeUi
   ) {
-
     console.log(`this.provider.connection.commitment :: ${this.provider.connection.commitment}`);
     const jitoTipInLamport = jitoTip * LAMPORTS_PER_SOL;
     console.log(`jitoTipInLamport :: ${jitoTipInLamport}`)
@@ -894,16 +893,16 @@ class MarginfiClient {
       throw Error("Jito bundle tip has not been set.");
     }
 
-    // if (priorityFee) {
-    //   const priorityFeeMicroLamports = priorityFee * LAMPORTS_PER_SOL * 1_000_000;
-    //   console.log(`priorityFeeMicroLamports :: ${priorityFeeMicroLamports}`)
+    if (priorityFee) {
+      const priorityFeeMicroLamports = priorityFee * LAMPORTS_PER_SOL * 1_000_000;
+      console.log(`priorityFeeMicroLamports :: ${priorityFeeMicroLamports}`)
 
-    //   tx.instructions.unshift(
-    //     ComputeBudgetProgram.setComputeUnitPrice({
-    //       microLamports: Math.round(priorityFeeMicroLamports),
-    //     })
-    //   );
-    // }
+      tx.instructions.unshift(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: Math.round(priorityFeeMicroLamports),
+        })
+      );
+    }
 
     // https://jito-foundation.gitbook.io/mev/mev-payment-and-distribution/on-chain-addresses
     tx.instructions.push(
@@ -916,17 +915,20 @@ class MarginfiClient {
       })
     );
 
-    const recentBlockhash = await this.provider.connection.getLatestBlockhash();
-    console.log(`recentBlockhash :: ${recentBlockhash.blockhash}`)
+    const getLatestBlockhashAndContext = await this.provider.connection.getLatestBlockhashAndContext();
+
+    const minContextSlot = getLatestBlockhashAndContext.context.slot - 4;
+    const recentBlockhash = getLatestBlockhashAndContext.value.blockhash;
 
     let vTx: VersionedTransaction = new VersionedTransaction(
       new TransactionMessage({
         payerKey: this.provider.publicKey,
-        recentBlockhash: recentBlockhash.blockhash,
+        recentBlockhash: recentBlockhash,
         instructions: tx.instructions,
       }).compileToV0Message([...(luts ?? [])])
     );
 
+    // Verify txSize limits
     const totalSize = vTx.message.serialize().length;
     const totalKeys = vTx.message.getAccountKeys({ addressLookupTableAccounts: luts }).length;
     console.log(`tx totalSize :: ${totalSize}`)
@@ -938,13 +940,10 @@ class MarginfiClient {
       return false
     }
 
-
     // Time to simulate the tx
     try {
-      const txSim = await this.provider.connection.simulateTransaction(vTx, {sigVerify: false,})
-          
-        console.log(txSim.value.logs);
-
+      const txSim = await this.provider.connection.simulateTransaction(vTx, { minContextSlot, sigVerify: false, })
+      console.log(txSim.value.logs);
     } catch (error: any) {
       if (error instanceof SendTransactionError) {
         if (error.logs) {
@@ -964,15 +963,28 @@ class MarginfiClient {
     }
 
 
-    vTx = (await this.wallet.signTransaction(vTx)) as VersionedTransaction;
+    try {
+      vTx = (await this.wallet.signTransaction(vTx)) as VersionedTransaction;
 
-    let rawTx = vTx.serialize();
+      const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
+      console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
 
-    const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
-    console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
+      return vTx;
+    } catch (error: any) {
+      console.error("Failed to sign the transaction", error);
+      throw new ProcessTransactionError(
+        error.message,
+        ProcessTransactionErrorType.FallthroughError
+      );
+    }
 
-    // console.log(this.provider.connection.simulateTransaction(vTx))
+  }
+  async sendAndConfirmTrancationJito(
+    tx: VersionedTransaction,
+  ) {
 
+    let rawTx = tx.serialize();
+    const recentBlockhash = await this.provider.connection.getLatestBlockhash();
 
     const encodedTx = bs58.encode(rawTx);
     const jitoURL = "https://mainnet.block-engine.jito.wtf/api/v1/transactions";

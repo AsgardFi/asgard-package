@@ -113,8 +113,9 @@ declare class MarginfiClient {
     processTransaction(transaction: Transaction | VersionedTransaction, signers?: Array<Signer>, opts?: TransactionOptions, connection_args?: Connection): Promise<TransactionSignature>;
     signTransaction(transaction: Transaction | VersionedTransaction, signers?: Array<Signer>, connectionArgs?: Connection): Promise<VersionedTransaction>;
     sendAndConfirmTransaction(versionedTransaction: VersionedTransaction, opts?: TransactionOptions, connectionArgs?: Connection): Promise<TransactionSignature>;
-    processTrancationJito(jitoTip: number, // in ui
-    tx: Transaction, luts?: AddressLookupTableAccount[], priorityFee?: number): Promise<string | false>;
+    signTranscationJito(jitoTip: number, // in ui
+    tx: Transaction, luts?: AddressLookupTableAccount[], priorityFee?: number): Promise<false | VersionedTransaction>;
+    sendAndConfirmTrancationJito(tx: VersionedTransaction): Promise<string>;
     simulateTransaction(transaction: Transaction | VersionedTransaction, accountsToInspect: PublicKey[]): Promise<(Buffer | null)[]>;
 }
 export default MarginfiClient;
