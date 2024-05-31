@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseProgramLogs = exports.getTransactionInstructionError = exports.getProgramName = exports.LOADER_IDS = exports.PROGRAM_INFO_BY_ID = exports.PROGRAM_NAMES = void 0;
 const anchor_1 = require("@coral-xyz/anchor");
 const bytes_1 = require("@coral-xyz/anchor/dist/cjs/utils/bytes");
 const web3_js_1 = require("@solana/web3.js");
@@ -650,8 +651,31 @@ class MarginfiClient {
         }
         // Time to simulate the tx
         try {
-            const txSim = await this.provider.connection.simulateTransaction(vTx, { minContextSlot, sigVerify: false, });
-            console.log(txSim.value.logs);
+            console.log(`[SIMULATING TRANSACTION]`);
+            const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
+            console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
+            const txSim = await this.provider.connection.simulateTransaction(vTx, { commitment: 'confirmed', replaceRecentBlockhash: true });
+            if (txSim.value.logs === null) {
+                throw new Error('Expected to receive logs from simulation');
+            }
+            if (txSim.value.logs.length === 0 && typeof txSim.value.err === 'string') {
+                console.log(txSim.value.err);
+            }
+            else {
+                // Prettify logs
+                const logs = parseProgramLogs(txSim.value.logs, txSim.value.err, Cluster.MainnetBeta);
+                console.log(`Simulation Logs 👇 \n`);
+                logs.map((logMeta, metaKey) => {
+                    // const logTexts = logMeta.logs.map(log => log.text);
+                    console.log(`==== #${metaKey} Instruction ====`);
+                    logMeta.logs.map((log) => {
+                        console.log(log.text);
+                        if (log.text.includes("Program returned error")) {
+                            throw new Error("Error while simulating the transaction");
+                        }
+                    });
+                });
+            }
         }
         catch (error) {
             if (error instanceof web3_js_1.SendTransactionError) {
@@ -668,8 +692,6 @@ class MarginfiClient {
         }
         try {
             vTx = (await this.wallet.signTransaction(vTx));
-            const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
-            console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
             return vTx;
         }
         catch (error) {
@@ -677,6 +699,27 @@ class MarginfiClient {
             throw new errors_1.ProcessTransactionError(error.message, errors_1.ProcessTransactionErrorType.FallthroughError);
         }
     }
+    // ProgramLogsCardBody({
+    //   message,
+    //   logs,
+    //   cluster,
+    //   url,
+    // }: {
+    //   message: VersionedMessage | ParsedMessage;
+    //   logs: InstructionLogs[];
+    //   cluster: Cluster;
+    //   url: string;
+    // }) {
+    //   let logIndex = 0;
+    //   let instructionProgramIds: PublicKey[];
+    //   if ('compiledInstructions' in message) {
+    //       instructionProgramIds = message.compiledInstructions.map(ix => {
+    //           return message.staticAccountKeys[ix.programIdIndex];
+    //       });
+    //   } else {
+    //       instructionProgramIds = message.instructions.map(ix => ix.programId);
+    //   }
+    // }
     async sendAndConfirmTrancationJito(tx) {
         let rawTx = tx.serialize();
         const recentBlockhash = await this.provider.connection.getLatestBlockhash();
@@ -766,4 +809,660 @@ class MarginfiClient {
         }
     }
 }
+var PROGRAM_NAMES;
+(function (PROGRAM_NAMES) {
+    // native built-ins
+    PROGRAM_NAMES["ADDRESS_LOOKUP_TABLE"] = "Address Lookup Table Program";
+    PROGRAM_NAMES["COMPUTE_BUDGET"] = "Compute Budget Program";
+    PROGRAM_NAMES["CONFIG"] = "Config Program";
+    PROGRAM_NAMES["STAKE"] = "Stake Program";
+    PROGRAM_NAMES["SYSTEM"] = "System Program";
+    PROGRAM_NAMES["VOTE"] = "Vote Program";
+    // native precompiles
+    PROGRAM_NAMES["SECP256K1"] = "Secp256k1 SigVerify Precompile";
+    PROGRAM_NAMES["ED25519"] = "Ed25519 SigVerify Precompile";
+    // spl
+    PROGRAM_NAMES["ASSOCIATED_TOKEN"] = "Associated Token Program";
+    PROGRAM_NAMES["ACCOUNT_COMPRESSION"] = "State Compression Program";
+    PROGRAM_NAMES["FEATURE_PROPOSAL"] = "Feature Proposal Program";
+    PROGRAM_NAMES["LENDING"] = "Lending Program";
+    PROGRAM_NAMES["MEMO_1"] = "Memo Program v1";
+    PROGRAM_NAMES["MEMO"] = "Memo Program";
+    PROGRAM_NAMES["NAME"] = "Name Service Program";
+    PROGRAM_NAMES["STAKE_POOL"] = "Stake Pool Program";
+    PROGRAM_NAMES["SWAP"] = "Swap Program";
+    PROGRAM_NAMES["TOKEN"] = "Token Program";
+    PROGRAM_NAMES["TOKEN_2022"] = "Token-2022 Program";
+    PROGRAM_NAMES["TOKEN_METADATA"] = "Token Metadata Program";
+    PROGRAM_NAMES["TOKEN_VAULT"] = "Token Vault Program";
+    // other
+    PROGRAM_NAMES["ACUMEN"] = "Acumen Program";
+    PROGRAM_NAMES["BREAK_SOLANA"] = "Break Solana Program";
+    PROGRAM_NAMES["CHAINLINK_ORACLE"] = "Chainlink OCR2 Oracle Program";
+    PROGRAM_NAMES["CHAINLINK_STORE"] = "Chainlink Store Program";
+    PROGRAM_NAMES["CLOCKWORK_1"] = "Clockwork Thread Program v1";
+    PROGRAM_NAMES["CLOCKWORK_2"] = "Clockwork Thread Program v2";
+    PROGRAM_NAMES["MANGO_GOVERNANCE"] = "Mango Governance Program";
+    PROGRAM_NAMES["MANGO_ICO"] = "Mango ICO Program";
+    PROGRAM_NAMES["MANGO_1"] = "Mango Program v1";
+    PROGRAM_NAMES["MANGO_2"] = "Mango Program v2";
+    PROGRAM_NAMES["MANGO_3"] = "Mango Program v3";
+    PROGRAM_NAMES["MARINADE"] = "Marinade Staking Program";
+    PROGRAM_NAMES["MERCURIAL"] = "Mercurial Stable Swap Program";
+    PROGRAM_NAMES["METAPLEX"] = "Metaplex Program";
+    PROGRAM_NAMES["NFT_AUCTION"] = "NFT Auction Program";
+    PROGRAM_NAMES["NFT_CANDY_MACHINE"] = "NFT Candy Machine Program";
+    PROGRAM_NAMES["NFT_CANDY_MACHINE_V2"] = "NFT Candy Machine Program V2";
+    PROGRAM_NAMES["ORCA_SWAP_1"] = "Orca Swap Program v1";
+    PROGRAM_NAMES["ORCA_SWAP_2"] = "Orca Swap Program v2";
+    PROGRAM_NAMES["ORCA_AQUAFARM"] = "Orca Aquafarm Program";
+    PROGRAM_NAMES["PORT"] = "Port Finance Program";
+    PROGRAM_NAMES["PYTH_DEVNET"] = "Pyth Oracle Program";
+    PROGRAM_NAMES["PYTH_TESTNET"] = "Pyth Oracle Program";
+    PROGRAM_NAMES["PYTH_MAINNET"] = "Pyth Oracle Program";
+    PROGRAM_NAMES["QUARRY_MERGE_MINE"] = "Quarry Merge Mine";
+    PROGRAM_NAMES["QUARRY_MINE"] = "Quarry Mine";
+    PROGRAM_NAMES["QUARRY_MINT_WRAPPER"] = "Quarry Mint Wrapper";
+    PROGRAM_NAMES["QUARRY_REDEEMER"] = "Quarry Redeemer";
+    PROGRAM_NAMES["QUARRY_REGISTRY"] = "Quarry Registry";
+    PROGRAM_NAMES["RAYDIUM_AMM"] = "Raydium AMM Program";
+    PROGRAM_NAMES["RAYDIUM_IDO"] = "Raydium IDO Program";
+    PROGRAM_NAMES["RAYDIUM_LP_1"] = "Raydium Liquidity Pool Program v1";
+    PROGRAM_NAMES["RAYDIUM_LP_2"] = "Raydium Liquidity Pool Program v2";
+    PROGRAM_NAMES["RAYDIUM_STAKING"] = "Raydium Staking Program";
+    PROGRAM_NAMES["SABER_ROUTER"] = "Saber Router Program";
+    PROGRAM_NAMES["SABER_SWAP"] = "Saber Stable Swap Program";
+    PROGRAM_NAMES["SERUM_1"] = "Serum Dex Program v1";
+    PROGRAM_NAMES["SERUM_2"] = "Serum Dex Program v2";
+    PROGRAM_NAMES["SERUM_3"] = "Serum Dex Program v3";
+    PROGRAM_NAMES["SERUM_SWAP"] = "Serum Swap Program";
+    PROGRAM_NAMES["SERUM_POOL"] = "Serum Pool";
+    PROGRAM_NAMES["SOLEND"] = "Solend Program";
+    PROGRAM_NAMES["SOLIDO"] = "Lido for Solana Program";
+    PROGRAM_NAMES["STEP_SWAP"] = "Step Finance Swap Program";
+    PROGRAM_NAMES["SWIM_SWAP"] = "Swim Swap Program";
+    PROGRAM_NAMES["SWITCHBOARD"] = "Switchboard Oracle Program";
+    PROGRAM_NAMES["WORMHOLE"] = "Wormhole";
+    PROGRAM_NAMES["WORMHOLE_CORE"] = "Wormhole Core Bridge";
+    PROGRAM_NAMES["WORMHOLE_TOKEN"] = "Wormhole Token Bridge";
+    PROGRAM_NAMES["WORMHOLE_NFT"] = "Wormhole NFT Bridge";
+    PROGRAM_NAMES["SOLANART"] = "Solanart";
+    PROGRAM_NAMES["SOLANART_GO"] = "Solanart - Global offers";
+    PROGRAM_NAMES["STEPN_DEX"] = "STEPN Dex";
+    PROGRAM_NAMES["OPENBOOK_DEX"] = "OpenBook Dex";
+})(PROGRAM_NAMES = exports.PROGRAM_NAMES || (exports.PROGRAM_NAMES = {}));
+var Cluster;
+(function (Cluster) {
+    Cluster[Cluster["MainnetBeta"] = 0] = "MainnetBeta";
+    Cluster[Cluster["Testnet"] = 1] = "Testnet";
+    Cluster[Cluster["Devnet"] = 2] = "Devnet";
+    Cluster[Cluster["Custom"] = 3] = "Custom";
+})(Cluster || (Cluster = {}));
+const ALL_CLUSTERS = [Cluster.Custom, Cluster.Devnet, Cluster.Testnet, Cluster.MainnetBeta];
+const LIVE_CLUSTERS = [Cluster.Devnet, Cluster.Testnet, Cluster.MainnetBeta];
+exports.PROGRAM_INFO_BY_ID = {
+    '11111111111111111111111111111111': {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.SYSTEM,
+    },
+    '22Y43yTVxuUkoRKdm9thyRhQ3SdgQS7c7kB6UNCiaczD': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SERUM_SWAP,
+    },
+    '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.RAYDIUM_LP_2,
+    },
+    '2rHhojZ7hpu1zA91nvZmT8TqWWvMcKmmNBCr2mKTtMq4': {
+        deployments: [Cluster.Devnet],
+        name: PROGRAM_NAMES.WORMHOLE_NFT,
+    },
+    '3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv': {
+        deployments: [Cluster.MainnetBeta, Cluster.Devnet],
+        name: PROGRAM_NAMES.CLOCKWORK_1,
+    },
+    '3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5': {
+        deployments: [Cluster.Devnet],
+        name: PROGRAM_NAMES.WORMHOLE_CORE,
+    },
+    '5ZfZAwP2m93waazg8DkrrVmsupeiPEvaEHowiUP7UAbJ': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SOLANART_GO,
+    },
+    '5fNfvyp5czQVX77yoACa3JJVEhdRaWjPuazuWgjhTqEH': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.MANGO_2,
+    },
+    '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.RAYDIUM_AMM,
+    },
+    '7sPptkymzvayoSbLXzBsXEF8TSf3typNnAWkrKrDizNb': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.MANGO_ICO,
+    },
+    '82yxjeMsvaURa4MbZZ7WZZHfobirZYkH1zF8fmeGtyaQ': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.ORCA_AQUAFARM,
+    },
+    '8tfDNiaEyrV6Q1U4DEXrEigs9DoDtkugzFbybENEbCDz': {
+        deployments: [Cluster.Testnet],
+        name: PROGRAM_NAMES.PYTH_TESTNET,
+    },
+    '9HzJyW1qZsEiSfMUf6L2jo3CcTKAyBmSyKdwQeYisHrC': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.RAYDIUM_IDO,
+    },
+    '9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.ORCA_SWAP_2,
+    },
+    '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin': {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SERUM_3,
+    },
+    // spl
+    ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.ASSOCIATED_TOKEN,
+    },
+    // native built-ins
+    AddressLookupTab1e1111111111111111111111111: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.ADDRESS_LOOKUP_TABLE,
+    },
+    BJ3jrUzddfuSrZHXSCxMUUQsjKEyLmuuyZebkcaFp2fg: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SERUM_1,
+    },
+    BrEAK7zGZ6dM71zUDACDqJnekihmwF15noTddWTsknjC: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.BREAK_SOLANA,
+    },
+    // other
+    C64kTdg1Hzv5KoQmZrQRcm2Qz7PkxtFBgw7EpFhvYn8W: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.ACUMEN,
+    },
+    CJsLwbP1iu5DuUikHEJnLfANgKy6stB2uFgvBBHoyxwz: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SOLANART,
+    },
+    CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh: {
+        deployments: [Cluster.MainnetBeta, Cluster.Devnet],
+        name: PROGRAM_NAMES.CLOCKWORK_2,
+    },
+    ComputeBudget111111111111111111111111111111: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.COMPUTE_BUDGET,
+    },
+    Config1111111111111111111111111111111111111: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.CONFIG,
+    },
+    CrX7kMhLC3cSsXJdT7JDgqrRVWGnUpX3gfEfxxU2NVLi: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SOLIDO,
+    },
+    Crt7UoUR6QgrFrN7j8rmSQpUTNWNSitSwWvsWGf1qZ5t: {
+        deployments: [Cluster.Devnet, Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SABER_ROUTER,
+    },
+    DZnkkTmCiFWfYTfT41X3Rd1kDgozqzxWaHqsw6W4x2oe: {
+        deployments: [Cluster.Devnet],
+        name: PROGRAM_NAMES.WORMHOLE_TOKEN,
+    },
+    DjVE6JNiYqPL2QXyCUUh8rNjHrbz9hXHNYt99MQ59qw1: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.ORCA_SWAP_1,
+    },
+    Dooar9JkhdZ7J3LHN3A7YCuoGRUggXhQaG4kijfLGU2j: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.STEPN_DEX,
+    },
+    DtmE9D2CSB4L5D6A15mraeEjrGMm6auWVzgaD8hK2tZM: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SWITCHBOARD,
+    },
+    EUqojwWA2rd19FZrzeBncJsm38Jm1hEhE3zsmX3bRc2o: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SERUM_2,
+    },
+    Ed25519SigVerify111111111111111111111111111: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.ED25519,
+    },
+    EhhTKczWMGQt46ynNeRX1WfeagwwJd7ufHvCDjRxjo5Q: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.RAYDIUM_STAKING,
+    },
+    Feat1YXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNgAse: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.FEATURE_PROPOSAL,
+    },
+    FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.PYTH_MAINNET,
+    },
+    GqTPL6qRf5aUuqscLh8Rg2HTxPUXfhhAXDptTLhp1t2J: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.MANGO_GOVERNANCE,
+    },
+    HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny: {
+        deployments: [Cluster.Devnet, Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.CHAINLINK_STORE,
+    },
+    JD3bq9hGdy38PuWQ4h2YJpELmHVGPPfFSuFkpzAd9zfu: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.MANGO_1,
+    },
+    KeccakSecp256k11111111111111111111111111111: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.SECP256K1,
+    },
+    LendZqTs7gn5CTSJU1jWKhKuVpjJGom45nnwPb2AMTi: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.LENDING,
+    },
+    MERLuDFBMmsHnsBPZw2sDQZHvXFMwp8EdjudcU2HKky: {
+        deployments: [Cluster.Devnet, Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.MERCURIAL,
+    },
+    MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.MARINADE,
+    },
+    Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.MEMO_1,
+    },
+    MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.MEMO,
+    },
+    Port7uDYB3wk6GJAw4KT1WpTeMtSu9bTcChBHkX2LfR: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.PORT,
+    },
+    QMMD16kjauP5knBwxNUJRZ1Z5o3deBuFrqVjBVmmqto: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.QUARRY_MERGE_MINE,
+    },
+    QMNeHCGYnLVDn1icRAfQZpjPLBNkfGbSKRB83G5d8KB: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.QUARRY_MINE,
+    },
+    QMWoBmAyJLAsA1Lh9ugMTw2gciTihncciphzdNzdZYV: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.QUARRY_MINT_WRAPPER,
+    },
+    QRDxhMw1P2NEfiw5mYXG79bwfgHTdasY2xNP76XSea9: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.QUARRY_REDEEMER,
+    },
+    QREGBnEj9Sa5uR91AV8u3FxThgP5ZCvdZUW2bHAkfNc: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.QUARRY_REGISTRY,
+    },
+    RVKd61ztZW9GUwhRbbLoYVRE5Xf1B2tVscKqwZqXgEr: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.RAYDIUM_LP_1,
+    },
+    SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.STAKE_POOL,
+    },
+    SSwpMgqNDsyV7mAgN9ady4bDVu5ySjmmXejXvy2vLt1: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.STEP_SWAP,
+    },
+    SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ: {
+        deployments: [Cluster.Devnet, Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SABER_SWAP,
+    },
+    SWiMDJYFUGj6cPrQ6QYYYWZtvXQdRChSVAygDZDsCHC: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SWIM_SWAP,
+    },
+    So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SOLEND,
+    },
+    Stake11111111111111111111111111111111111111: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.STAKE,
+    },
+    SwaPpA9LAaLfeLi3a68M4DjnLqgtticKg6CnyNwgAC8: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.SWAP,
+    },
+    TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.TOKEN,
+    },
+    TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.TOKEN_2022,
+    },
+    Vote111111111111111111111111111111111111111: {
+        deployments: ALL_CLUSTERS,
+        name: PROGRAM_NAMES.VOTE,
+    },
+    WnFt12ZrnzZrFZkt2xsNsaNWoQribnuQ5B5FrDbwDhD: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.WORMHOLE_NFT,
+    },
+    WormT3McKhFJ2RkiGpdw9GKvNCrB2aB54gb2uV9MfQC: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.WORMHOLE,
+    },
+    WvmTNLpGMVbwJVYztYL4Hnsy82cJhQorxjnnXcRm3b6: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.SERUM_POOL,
+    },
+    auctxRXPeJoc4817jDhf4HbjnhEcr1cCXenosMhK5R8: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.NFT_AUCTION,
+    },
+    cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ: {
+        deployments: [Cluster.Devnet, Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.CHAINLINK_ORACLE,
+    },
+    cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK: {
+        deployments: [Cluster.Devnet, Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.ACCOUNT_COMPRESSION,
+    },
+    cndy3Z4yapfJBmL3ShUp5exZKqR3z33thTzeNMm2gRZ: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.NFT_CANDY_MACHINE_V2,
+    },
+    cndyAnrLdpjq1Ssp1z8xxDsB8dxe7u4HL5Nxi2K5WXZ: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.NFT_CANDY_MACHINE,
+    },
+    gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s: {
+        deployments: [Cluster.Devnet],
+        name: PROGRAM_NAMES.PYTH_DEVNET,
+    },
+    metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.TOKEN_METADATA,
+    },
+    mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.MANGO_3,
+    },
+    namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.NAME,
+    },
+    p1exdMJcjVao65QdewkaZRUnU6VPSXhus9n2GzWfh98: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.METAPLEX,
+    },
+    srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.OPENBOOK_DEX,
+    },
+    vau1zxA2LbssAUEF7Gpw91zMM1LvXrvpzJtmZ58rPsn: {
+        deployments: LIVE_CLUSTERS,
+        name: PROGRAM_NAMES.TOKEN_VAULT,
+    },
+    worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.WORMHOLE_CORE,
+    },
+    wormDTUJ6AWPNvk59vGQbDvGJmqbDTdgWgAqcLBCgUb: {
+        deployments: [Cluster.MainnetBeta],
+        name: PROGRAM_NAMES.WORMHOLE_TOKEN,
+    },
+};
+exports.LOADER_IDS = {
+    BPFLoader1111111111111111111111111111111111: 'BPF Loader',
+    BPFLoader2111111111111111111111111111111111: 'BPF Loader 2',
+    BPFLoaderUpgradeab1e11111111111111111111111: 'BPF Upgradeable Loader',
+    MoveLdr111111111111111111111111111111111111: 'Move Loader',
+    NativeLoader1111111111111111111111111111111: 'Native Loader',
+};
+function getProgramName(address, cluster) {
+    const label = programLabel(address, cluster);
+    if (label)
+        return label;
+    return `Unknown Program (${address})`;
+}
+exports.getProgramName = getProgramName;
+function programLabel(address, cluster) {
+    const programInfo = exports.PROGRAM_INFO_BY_ID[address];
+    if (programInfo && programInfo.deployments.includes(cluster)) {
+        return programInfo.name;
+    }
+    return exports.LOADER_IDS[address];
+}
+const instructionErrorMessage = new Map([
+    ['GenericError', 'generic instruction error'],
+    ['InvalidArgument', 'invalid program argument'],
+    ['InvalidInstructionData', 'invalid instruction data'],
+    ['InvalidAccountData', 'invalid account data for instruction'],
+    ['AccountDataTooSmall', 'account data too small for instruction'],
+    ['InsufficientFunds', 'insufficient funds for instruction'],
+    ['IncorrectProgramId', 'incorrect program id for instruction'],
+    ['MissingRequiredSignature', 'missing required signature for instruction'],
+    ['AccountAlreadyInitialized', 'instruction requires an uninitialized account'],
+    ['UninitializedAccount', 'instruction requires an initialized account'],
+    ['UnbalancedInstruction', 'sum of account balances before and after instruction do not match'],
+    ['ModifiedProgramId', 'instruction modified the program id of an account'],
+    ['ExternalAccountLamportSpend', 'instruction spent from the balance of an account it does not own'],
+    ['ExternalAccountDataModified', 'instruction modified data of an account it does not own'],
+    ['ReadonlyLamportChange', 'instruction changed the balance of a read-only account'],
+    ['ReadonlyDataModified', 'instruction modified data of a read-only account'],
+    ['DuplicateAccountIndex', 'instruction contains duplicate accounts'],
+    ['ExecutableModified', 'instruction changed executable bit of an account'],
+    ['RentEpochModified', 'instruction modified rent epoch of an account'],
+    ['NotEnoughAccountKeys', 'insufficient account keys for instruction'],
+    ['AccountDataSizeChanged', 'non-system instruction changed account size'],
+    ['AccountNotExecutable', 'instruction expected an executable account'],
+    ['AccountBorrowFailed', 'instruction tries to borrow reference for an account which is already borrowed'],
+    ['AccountBorrowOutstanding', 'instruction left account with an outstanding borrowed reference'],
+    ['DuplicateAccountOutOfSync', 'instruction modifications of multiply-passed account differ'],
+    ['Custom', 'custom program error: {0}'],
+    ['InvalidError', 'program returned invalid error code'],
+    ['ExecutableDataModified', 'instruction changed executable accounts data'],
+    ['ExecutableLamportChange', 'instruction changed the balance of a executable account'],
+    ['ExecutableAccountNotRentExempt', 'executable accounts must be rent exempt'],
+    ['UnsupportedProgramId', 'Unsupported program id'],
+    ['CallDepth', 'Cross-program invocation call depth too deep'],
+    ['MissingAccount', 'An account required by the instruction is missing'],
+    ['ReentrancyNotAllowed', 'Cross-program invocation reentrancy not allowed for this instruction'],
+    ['MaxSeedLengthExceeded', 'Length of the seed is too long for address generation'],
+    ['InvalidSeeds', 'Provided seeds do not result in a valid address'],
+    ['InvalidRealloc', 'Failed to reallocate account data'],
+    ['ComputationalBudgetExceeded', 'Computational budget exceeded'],
+    ['PrivilegeEscalation', 'Cross-program invocation with unauthorized signer or writable account'],
+    ['ProgramEnvironmentSetupFailure', 'Failed to create program execution environment'],
+    ['ProgramFailedToComplete', 'Program failed to complete'],
+    ['ProgramFailedToCompile', 'Program failed to compile'],
+    ['Immutable', 'Account is immutable'],
+    ['IncorrectAuthority', 'Incorrect authority provided'],
+    ['BorshIoError', 'Failed to serialize or deserialize account data: {0}'],
+    ['AccountNotRentExempt', 'An account does not have enough lamports to be rent-exempt'],
+    ['InvalidAccountOwner', 'Invalid account owner'],
+    ['ArithmeticOverflow', 'Program arithmetic overflowed'],
+    ['UnsupportedSysvar', 'Unsupported sysvar'],
+    ['IllegalOwner', 'Provided owner is not allowed'],
+]);
+function getTransactionInstructionError(error) {
+    if (!error) {
+        return;
+    }
+    if (typeof error === 'object' && 'InstructionError' in error) {
+        const innerError = error['InstructionError'];
+        const index = innerError[0];
+        const instructionError = innerError[1];
+        return {
+            index,
+            message: getInstructionError(instructionError),
+        };
+    }
+}
+exports.getTransactionInstructionError = getTransactionInstructionError;
+function getInstructionError(error) {
+    let out;
+    let value;
+    if (typeof error === 'string') {
+        const message = instructionErrorMessage.get(error);
+        if (message) {
+            return message;
+        }
+    }
+    else if ('Custom' in error) {
+        out = instructionErrorMessage.get('Custom');
+        value = error['Custom'];
+    }
+    else if ('BorshIoError' in error) {
+        out = instructionErrorMessage.get('BorshIoError');
+        value = error['BorshIoError'];
+    }
+    if (out && value) {
+        return out.replace('{0}', value);
+    }
+    return 'Unknown instruction error';
+}
+function parseProgramLogs(logs, error, cluster) {
+    let depth = 0;
+    const prettyLogs = [];
+    function prefixBuilder(
+    // Indent level starts at 1.
+    indentLevel) {
+        let prefix;
+        if (indentLevel <= 0) {
+            console.warn(`Tried to build a prefix for a program log at indent level \`${indentLevel}\`. ` +
+                'Logs should only ever be built at indent level 1 or higher.');
+            prefix = '';
+        }
+        else {
+            prefix = new Array(indentLevel - 1).fill('\u00A0\u00A0').join('');
+        }
+        return prefix + '> ';
+    }
+    let prettyError;
+    if (error) {
+        prettyError = getTransactionInstructionError(error);
+    }
+    logs.forEach(log => {
+        if (log.startsWith('Program log:')) {
+            // Use passive tense
+            log = log.replace(/Program log: (.*)/g, (match, p1) => {
+                return `Program logged: "${p1}"`;
+            });
+            prettyLogs[prettyLogs.length - 1].logs.push({
+                prefix: prefixBuilder(depth),
+                style: 'muted',
+                text: log,
+            });
+        }
+        else if (log.startsWith('Log truncated')) {
+            prettyLogs[prettyLogs.length - 1].truncated = true;
+        }
+        else {
+            const regex = /Program (\w*) invoke \[(\d)\]/g;
+            const matches = Array.from(log.matchAll(regex));
+            if (matches.length > 0) {
+                const programAddress = matches[0][1];
+                const programName = getProgramName(programAddress, cluster);
+                if (depth === 0) {
+                    prettyLogs.push({
+                        computeUnits: 0,
+                        failed: false,
+                        invokedProgram: programAddress,
+                        logs: [],
+                        truncated: false,
+                    });
+                }
+                else {
+                    prettyLogs[prettyLogs.length - 1].logs.push({
+                        prefix: prefixBuilder(depth),
+                        style: 'info',
+                        text: `Program invoked: ${programName}`,
+                    });
+                }
+                depth++;
+            }
+            else if (log.includes('success')) {
+                prettyLogs[prettyLogs.length - 1].logs.push({
+                    prefix: prefixBuilder(depth),
+                    style: 'success',
+                    text: `Program returned success`,
+                });
+                depth--;
+            }
+            else if (log.includes('failed')) {
+                const instructionLog = prettyLogs[prettyLogs.length - 1];
+                instructionLog.failed = true;
+                let currText = `Program returned error: "${log.slice(log.indexOf(': ') + 2)}"`;
+                // failed to verify log of previous program so reset depth and print full log
+                if (log.startsWith('failed')) {
+                    depth++;
+                    currText = log.charAt(0).toUpperCase() + log.slice(1);
+                }
+                instructionLog.logs.push({
+                    prefix: prefixBuilder(depth),
+                    style: 'warning',
+                    text: currText,
+                });
+                depth--;
+            }
+            else {
+                if (depth === 0) {
+                    prettyLogs.push({
+                        computeUnits: 0,
+                        failed: false,
+                        invokedProgram: null,
+                        logs: [],
+                        truncated: false,
+                    });
+                    depth++;
+                }
+                // Remove redundant program address from logs
+                log = log.replace(/Program \w* consumed (\d*) (.*)/g, (match, p1, p2) => {
+                    // Only aggregate compute units consumed from top-level tx instructions
+                    // because they include inner ix compute units as well.
+                    if (depth === 1) {
+                        prettyLogs[prettyLogs.length - 1].computeUnits += Number.parseInt(p1);
+                    }
+                    return `Program consumed: ${p1} ${p2}`;
+                });
+                // native program logs don't start with "Program log:"
+                prettyLogs[prettyLogs.length - 1].logs.push({
+                    prefix: prefixBuilder(depth),
+                    style: 'muted',
+                    text: log,
+                });
+            }
+        }
+    });
+    // If the instruction's simulation returned an error without any logs then add an empty log entry for Runtime error
+    // For example BpfUpgradableLoader fails without returning any logs for Upgrade instruction with buffer that doesn't exist
+    if (prettyError && prettyLogs.length === 0) {
+        prettyLogs.push({
+            computeUnits: 0,
+            failed: true,
+            invokedProgram: null,
+            logs: [],
+            truncated: false,
+        });
+    }
+    if (prettyError && prettyError.index === prettyLogs.length - 1) {
+        const failedIx = prettyLogs[prettyError.index];
+        if (!failedIx.failed) {
+            failedIx.failed = true;
+            failedIx.logs.push({
+                prefix: prefixBuilder(1),
+                style: 'warning',
+                text: `Runtime error: ${prettyError.message}`,
+            });
+        }
+    }
+    return prettyLogs;
+}
+exports.parseProgramLogs = parseProgramLogs;
 exports.default = MarginfiClient;
