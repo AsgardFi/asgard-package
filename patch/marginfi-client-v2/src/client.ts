@@ -953,7 +953,9 @@ class MarginfiClient {
         throw new Error('Expected to receive logs from simulation');
       }
       if (txSim.value.logs.length === 0 && typeof txSim.value.err === 'string') {
+        console.log(`simulation error 👇 /n ${txSim.value.err}`)
         console.log(txSim.value.err);
+        throw new Error(`Error while simulating the transaction 👇 /n ${txSim.value.err}`)
       } else {
         // Prettify logs
         const logs = parseProgramLogs(txSim.value.logs, txSim.value.err, Cluster.MainnetBeta)
@@ -1000,28 +1002,6 @@ class MarginfiClient {
     }
 
   }
-
-  // ProgramLogsCardBody({
-  //   message,
-  //   logs,
-  //   cluster,
-  //   url,
-  // }: {
-  //   message: VersionedMessage | ParsedMessage;
-  //   logs: InstructionLogs[];
-  //   cluster: Cluster;
-  //   url: string;
-  // }) {
-  //   let logIndex = 0;
-  //   let instructionProgramIds: PublicKey[];
-  //   if ('compiledInstructions' in message) {
-  //       instructionProgramIds = message.compiledInstructions.map(ix => {
-  //           return message.staticAccountKeys[ix.programIdIndex];
-  //       });
-  //   } else {
-  //       instructionProgramIds = message.instructions.map(ix => ix.programId);
-  //   }
-  // }
 
   async sendAndConfirmTrancationJito(
     tx: VersionedTransaction,
