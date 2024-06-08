@@ -1024,19 +1024,39 @@ class MarginfiClient {
     };
     // let txOpts = commitmentConfig(provider.connection.commitment);
     let txSig: string;
+    while (true) {
+      try {
+        const response = await axios.post(jitoURL, payload, {
+          headers: { "Content-Type": "application/json" },
+        });
+        console.log(`JitoResponse :: ${JSON.stringify(response.data)}`);
 
-    try {
-      const response = await axios.post(jitoURL, payload, {
-        headers: { "Content-Type": "application/json" },
-      });
-      console.log(`JitoResponse :: ${JSON.stringify(response.data)}`)
-
-      txSig = response.data.result;
-      console.log(`txSig :: ${txSig}`)
-    } catch (error) {
-      console.error("Error:", error);
-      throw new Error("Jito Bundle Error: cannot send.");
+        txSig = response.data.result;
+        console.log(`txSig :: ${txSig}`);
+        break; // Exit loop if the request is successful
+      } catch (error: any) {
+        console.error(`Error: ${error}`);
+        console.log("Retrying to send the transaction...");
+      }
+      console.log("Resending jitobundle")
+      await sleep(500); // Don't spam jito bundle RPC
     }
+    // let sentJitoBundle = false
+    // // send jito bunle untile it turn, trues
+    // try {
+    //   const response = await axios.post(jitoURL, payload, {
+    //     headers: { "Content-Type": "application/json" },
+    //   });
+    //   console.log(`JitoResponse :: ${JSON.stringify(response.data)}`)
+
+    //   txSig = response.data.result;
+    //   // turn sentJitoBundle to true
+    //   console.log(`txSig :: ${txSig}`)
+    // } catch (error) {
+    //   console.error("Error:", error);
+    //   throw new Error("Jito Bundle Error: cannot send.");
+    // }
+    // // keep repeting
 
     let currentBlockHeight = await this.provider.connection.getBlockHeight(
       this.provider.connection.commitment

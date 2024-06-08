@@ -719,6 +719,7 @@ class MarginfiAccount {
 
     // Add emissions-related instructions if necessary
     if (withdrawAll && !bank.emissionsMint.equals(PublicKey.default)) {
+      console.log(`Adding emmision related tx`)
       const userAta = getAssociatedTokenAddressSync(bank.emissionsMint, this.authority, true); // We allow off curve addresses here to support Fuse.
       const createAtaIdempotentIx = createAssociatedTokenAccountIdempotentInstruction(
         this.authority,
@@ -762,7 +763,9 @@ class MarginfiAccount {
       { amount: uiToNative(amount, bank.mintDecimals), withdrawAll },
       remainingAccounts
     );
-    const withdrawIxs = bank.mint.equals(NATIVE_MINT) ? this.wrapInstructionForWSol(ix) : [ix];
+    // const withdrawIxs = bank.mint.equals(NATIVE_MINT) ? this.wrapInstructionForWSol(ix) : [ix];
+    console.log("yoyooyoy")
+    const withdrawIxs = [ix];
     ixs.push(...withdrawIxs);
 
     return {
@@ -980,6 +983,8 @@ class MarginfiAccount {
         case "lendingAccountRepay":
         case "lendingAccountWithdraw": {
           const targetBank = new PublicKey(ix.keys[3].pubkey);
+          console.log(`targetBank :: ${targetBank.toBase58()}`)
+
           const targetBalance = projectedBalances.find((b) => b.bankPk.equals(targetBank));
           if (!targetBalance) {
             throw Error(

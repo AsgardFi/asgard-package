@@ -718,18 +718,38 @@ class MarginfiClient {
         };
         // let txOpts = commitmentConfig(provider.connection.commitment);
         let txSig;
-        try {
-            const response = await axios_1.default.post(jitoURL, payload, {
-                headers: { "Content-Type": "application/json" },
-            });
-            console.log(`JitoResponse :: ${JSON.stringify(response.data)}`);
-            txSig = response.data.result;
-            console.log(`txSig :: ${txSig}`);
+        while (true) {
+            try {
+                const response = await axios_1.default.post(jitoURL, payload, {
+                    headers: { "Content-Type": "application/json" },
+                });
+                console.log(`JitoResponse :: ${JSON.stringify(response.data)}`);
+                txSig = response.data.result;
+                console.log(`txSig :: ${txSig}`);
+                break; // Exit loop if the request is successful
+            }
+            catch (error) {
+                console.error(`Error: ${error}`);
+                console.log("Retrying to send the transaction...");
+            }
+            console.log("Resending jitobundle");
+            await (0, mrgn_common_1.sleep)(500); // Don't spam jito bundle RPC
         }
-        catch (error) {
-            console.error("Error:", error);
-            throw new Error("Jito Bundle Error: cannot send.");
-        }
+        // let sentJitoBundle = false
+        // // send jito bunle untile it turn, trues
+        // try {
+        //   const response = await axios.post(jitoURL, payload, {
+        //     headers: { "Content-Type": "application/json" },
+        //   });
+        //   console.log(`JitoResponse :: ${JSON.stringify(response.data)}`)
+        //   txSig = response.data.result;
+        //   // turn sentJitoBundle to true
+        //   console.log(`txSig :: ${txSig}`)
+        // } catch (error) {
+        //   console.error("Error:", error);
+        //   throw new Error("Jito Bundle Error: cannot send.");
+        // }
+        // // keep repeting
         let currentBlockHeight = await this.provider.connection.getBlockHeight(this.provider.connection.commitment);
         while (currentBlockHeight < recentBlockhash.lastValidBlockHeight) {
             // Keep resending to maximise the chance of confirmation
