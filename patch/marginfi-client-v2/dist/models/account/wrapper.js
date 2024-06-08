@@ -79,6 +79,9 @@ class MarginfiAccountWrapper {
     getBalance(bankPk) {
         return this._marginfiAccount.getBalance(bankPk);
     }
+    updateAccountAddress(address) {
+        this._marginfiAccount.updateAccountAddress(address);
+    }
     canBeLiquidated() {
         const debugLogger = require("debug")(`mfi:margin-account:${this.address.toString()}:canBeLiquidated`);
         const { assets, liabilities } = this._marginfiAccount.computeHealthComponents(this.client.banks, this.client.oraclePrices, pure_1.MarginRequirementType.Maintenance);
@@ -351,13 +354,28 @@ class MarginfiAccountWrapper {
         }
         return tx;
     }
-    async buildFlashLoanTxV0(args, lookupTables) {
+    async buildFlashLoanTxV0(args, 
+    // lookupTables?: AddressLookupTableAccount[],
+    createNewAccountIx) {
         console.log("buildFlashLoanTxV0");
-        const endIndex = args.ixs.length + 1;
+        let endIndex;
+        if (createNewAccountIx) {
+            endIndex = args.ixs.length + 1 + 1;
+        }
+        else {
+            endIndex = args.ixs.length + 1;
+        }
         const projectedActiveBalances = this._marginfiAccount.projectActiveBalancesNoCpi(this._program, args.ixs);
         const beginFlashLoanIx = await this.makeBeginFlashLoanIx(endIndex);
         const endFlashLoanIx = await this.makeEndFlashLoanIx(projectedActiveBalances);
-        const ixs = [...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
+        let ixs = [];
+        if (createNewAccountIx) {
+            console.log("Adding new creation account");
+            ixs = [...createNewAccountIx.instructions, ...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
+        }
+        else {
+            ixs = [...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
+        }
         // const { blockhash } = await this._program.provider.connection.getLatestBlockhash();
         // console.log(`blockhash :: ${blockhash}`)
         const ftx = new web3_js_1.Transaction();

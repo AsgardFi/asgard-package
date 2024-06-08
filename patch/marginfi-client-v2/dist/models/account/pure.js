@@ -29,6 +29,16 @@ class MarginfiAccount {
         this.balances = marginfiAccountRaw.lendingAccount.balances.map(balance_1.Balance.from);
         this.accountFlags = marginfiAccountRaw.accountFlags;
     }
+    updateAccountAddress(address) {
+        // const existingData = {
+        //   group: this.group,
+        //   authority: this.authority,
+        //   lendingAccount: this.balances,
+        //   accountFlags: this.accountFlags
+        // }
+        // return new MarginfiAccount(address, existingData);
+        this.address = address;
+    }
     static async fetch(address, client) {
         const data = (await client.program.account.marginfiAccount.fetch(address));
         return new MarginfiAccount(address, data);
@@ -584,6 +594,7 @@ class MarginfiAccount {
         return { instructions: ixs, keys: [] };
     }
     async makeBeginFlashLoanIx(program, endIndex) {
+        console.log(`this.address :: ${this.address}`);
         const ix = await instructions_1.default.makeBeginFlashLoanIx(program, {
             marginfiAccount: this.address,
             signer: this.authority,

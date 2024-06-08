@@ -611,7 +611,7 @@ class MarginfiClient {
         }
     }
     async signTranscationJito(jitoTip, // in ui
-    tx, luts, priorityFee) {
+    tx, luts, signers, priorityFee) {
         console.log(`this.provider.connection.commitment :: ${this.provider.connection.commitment}`);
         const jitoTipInLamport = jitoTip * web3_js_1.LAMPORTS_PER_SOL;
         console.log(`jitoTipInLamport :: ${jitoTipInLamport}`);
@@ -640,6 +640,11 @@ class MarginfiClient {
             recentBlockhash: recentBlockhash,
             instructions: tx.instructions,
         }).compileToV0Message([...(luts ?? [])]));
+        if (signers) {
+            console.log(`Signing the tx with external signer`);
+            vTx.sign(signers);
+        }
+        // vTx = (await this.wallet.signTransaction(vTx)) as VersionedTransaction;
         // Verify txSize limits
         const totalSize = vTx.message.serialize().length;
         const totalKeys = vTx.message.getAccountKeys({ addressLookupTableAccounts: luts }).length;

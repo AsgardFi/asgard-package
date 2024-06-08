@@ -18,7 +18,7 @@ export interface FlashLoanArgs {
 }
 declare class MarginfiAccountWrapper {
     private readonly client;
-    readonly address: PublicKey;
+    address: PublicKey;
     private _marginfiAccount;
     /**
      * @internal
@@ -40,6 +40,7 @@ declare class MarginfiAccountWrapper {
     get isFlashLoanEnabled(): boolean;
     get isTransferAccountAuthorityEnabled(): boolean;
     getBalance(bankPk: PublicKey): Balance;
+    updateAccountAddress(address: PublicKey): void;
     canBeLiquidated(): boolean;
     computeHealthComponents(marginRequirement: MarginRequirementType, excludedBanks?: PublicKey[]): {
         assets: BigNumber;
@@ -91,7 +92,7 @@ declare class MarginfiAccountWrapper {
     makeEndFlashLoanIx(projectedActiveBalances: PublicKey[]): Promise<InstructionsWrapper>;
     flashLoan(args: FlashLoanArgs): Promise<string>;
     buildFlashLoanTx(args: FlashLoanArgs, lookupTables?: AddressLookupTableAccount[]): Promise<VersionedTransaction>;
-    buildFlashLoanTxV0(args: FlashLoanArgs, lookupTables?: AddressLookupTableAccount[]): Promise<Transaction>;
+    buildFlashLoanTxV0(args: FlashLoanArgs, createNewAccountIx?: InstructionsWrapper): Promise<Transaction>;
     makeTransferAccountAuthorityIx(newAccountAuthority: PublicKey): Promise<InstructionsWrapper>;
     transferAccountAuthority(newAccountAuthority: PublicKey): Promise<string>;
     getHealthCheckAccounts(mandatoryBanks?: Bank[], excludedBanks?: Bank[]): AccountMeta[];

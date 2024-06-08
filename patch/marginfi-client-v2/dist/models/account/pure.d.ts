@@ -32,6 +32,7 @@ declare class MarginfiAccount {
     balances: Balance[];
     private accountFlags;
     constructor(address: PublicKey, marginfiAccountRaw: MarginfiAccountRaw);
+    updateAccountAddress(address: PublicKey): void;
     static fetch(address: PublicKey, client: MarginfiClient): Promise<MarginfiAccount>;
     static decode(encoded: Buffer): MarginfiAccountRaw;
     static fromAccountParsed(marginfiAccountPk: Address, accountData: MarginfiAccountRaw): MarginfiAccount;

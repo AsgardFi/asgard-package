@@ -34,7 +34,7 @@ export interface FlashLoanArgs {
 }
 
 class MarginfiAccountWrapper {
-  public readonly address: PublicKey;
+  public address: PublicKey;
 
   private _marginfiAccount: MarginfiAccount;
 
@@ -136,6 +136,10 @@ class MarginfiAccountWrapper {
 
   public getBalance(bankPk: PublicKey): Balance {
     return this._marginfiAccount.getBalance(bankPk);
+  }
+
+  public updateAccountAddress(address: PublicKey) {
+    this._marginfiAccount.updateAccountAddress(address)
   }
 
   public canBeLiquidated(): boolean {
@@ -649,10 +653,17 @@ class MarginfiAccountWrapper {
 
   public async buildFlashLoanTxV0(
     args: FlashLoanArgs,
-    lookupTables?: AddressLookupTableAccount[]
+    // lookupTables?: AddressLookupTableAccount[],
+    createNewAccountIx?: InstructionsWrapper
   ): Promise<Transaction> {
     console.log("buildFlashLoanTxV0")
-    const endIndex = args.ixs.length + 1;
+    let endIndex;
+
+    if (createNewAccountIx) {
+      endIndex = args.ixs.length + 1 + 1;
+    } else {
+      endIndex = args.ixs.length + 1;
+    }
 
     const projectedActiveBalances: PublicKey[] = this._marginfiAccount.projectActiveBalancesNoCpi(
       this._program,
@@ -662,7 +673,14 @@ class MarginfiAccountWrapper {
     const beginFlashLoanIx = await this.makeBeginFlashLoanIx(endIndex);
     const endFlashLoanIx = await this.makeEndFlashLoanIx(projectedActiveBalances);
 
-    const ixs = [...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
+    let ixs = []
+    if (createNewAccountIx) {
+      console.log("Adding new creation account")
+      ixs = [...createNewAccountIx.instructions, ...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
+    } else {
+      ixs = [...beginFlashLoanIx.instructions, ...args.ixs, ...endFlashLoanIx.instructions];
+
+    }
 
     // const { blockhash } = await this._program.provider.connection.getLatestBlockhash();
     // console.log(`blockhash :: ${blockhash}`)
@@ -676,7 +694,7 @@ class MarginfiAccountWrapper {
     //   instructions: ixs,
     // }).compileToV0Message([...(lookupTables ?? []), ...(args.addressLookupTableAccounts ?? [])]);
 
-    
+
 
     // const tx = new VersionedTransaction(message);
 

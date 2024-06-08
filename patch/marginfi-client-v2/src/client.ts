@@ -886,6 +886,7 @@ class MarginfiClient {
     jitoTip: number, // in ui
     tx: Transaction,
     luts?: AddressLookupTableAccount[],
+    signers?: Array<Signer>,
     priorityFee?: number, // priorityFeeUi
   ) {
     console.log(`this.provider.connection.commitment :: ${this.provider.connection.commitment}`);
@@ -931,6 +932,13 @@ class MarginfiClient {
       }).compileToV0Message([...(luts ?? [])])
     );
 
+
+    if (signers) {
+      console.log(`Signing the tx with external signer`)
+      vTx.sign(signers);
+    }
+    // vTx = (await this.wallet.signTransaction(vTx)) as VersionedTransaction;
+
     // Verify txSize limits
     const totalSize = vTx.message.serialize().length;
     const totalKeys = vTx.message.getAccountKeys({ addressLookupTableAccounts: luts }).length;
@@ -948,7 +956,9 @@ class MarginfiClient {
       console.log(`[SIMULATING TRANSACTION]`)
       const messageEncoded = Buffer.from(vTx.message.serialize()).toString("base64");
       console.log(`------ messageEncoded 👇 ------ \n ${messageEncoded}`);
-      const txSim = await this.provider.connection.simulateTransaction(vTx, { commitment: 'confirmed', replaceRecentBlockhash: true })
+
+      const txSim = await this.provider.connection.simulateTransaction(vTx, { commitment: 'confirmed', replaceRecentBlockhash: true})
+
       if (txSim.value.logs === null) {
         throw new Error('Expected to receive logs from simulation');
       }
@@ -988,7 +998,6 @@ class MarginfiClient {
       console.log("fallthrough error", error);
       throw new ProcessTransactionError(error.message, ProcessTransactionErrorType.FallthroughError);
     }
-
 
     try {
       vTx = (await this.wallet.signTransaction(vTx)) as VersionedTransaction;

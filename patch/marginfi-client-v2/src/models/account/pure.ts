@@ -67,6 +67,16 @@ class MarginfiAccount {
     this.accountFlags = marginfiAccountRaw.accountFlags;
   }
 
+  updateAccountAddress(address: PublicKey) {
+    // const existingData = {
+    //   group: this.group,
+    //   authority: this.authority,
+    //   lendingAccount: this.balances,
+    //   accountFlags: this.accountFlags
+    // }
+    // return new MarginfiAccount(address, existingData);
+    this.address = address
+  }
   static async fetch(address: PublicKey, client: MarginfiClient): Promise<MarginfiAccount> {
     const data: MarginfiAccountRaw = (await client.program.account.marginfiAccount.fetch(address)) as any;
     return new MarginfiAccount(address, data);
@@ -907,6 +917,8 @@ class MarginfiAccount {
   }
 
   async makeBeginFlashLoanIx(program: MarginfiProgram, endIndex: number): Promise<InstructionsWrapper> {
+    console.log(`this.address :: ${this.address}`)
+
     const ix = await instructions.makeBeginFlashLoanIx(
       program,
       {
