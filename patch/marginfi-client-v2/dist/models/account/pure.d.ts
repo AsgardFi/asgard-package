@@ -32,7 +32,7 @@ declare class MarginfiAccount {
     balances: Balance[];
     private accountFlags;
     constructor(address: PublicKey, marginfiAccountRaw: MarginfiAccountRaw);
-    updateAccountAddress(address: PublicKey): void;
+    updateAccountAddressAndAuthority(address: PublicKey, authority: PublicKey): void;
     static fetch(address: PublicKey, client: MarginfiClient): Promise<MarginfiAccount>;
     static decode(encoded: Buffer): MarginfiAccountRaw;
     static fromAccountParsed(marginfiAccountPk: Address, accountData: MarginfiAccountRaw): MarginfiAccount;
@@ -93,7 +93,7 @@ declare class MarginfiAccount {
     makeWithdrawIx(program: MarginfiProgram, banks: Map<string, Bank>, amount: Amount, bankAddress: PublicKey, withdrawAll?: boolean, opt?: {
         observationBanksOverride?: PublicKey[];
     } | undefined): Promise<InstructionsWrapper>;
-    makeBorrowIx(program: MarginfiProgram, banks: Map<string, Bank>, amount: Amount, bankAddress: PublicKey, opt?: {
+    makeBorrowIx(program: MarginfiProgram, banks: Map<string, Bank>, amount: Amount, bankAddress: PublicKey, skipAtaSetup?: boolean, opt?: {
         observationBanksOverride?: PublicKey[];
     } | undefined): Promise<InstructionsWrapper>;
     makeWithdrawEmissionsIx(program: MarginfiProgram, banks: Map<string, Bank>, bankAddress: PublicKey): Promise<InstructionsWrapper>;

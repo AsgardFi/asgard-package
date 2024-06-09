@@ -79,8 +79,8 @@ class MarginfiAccountWrapper {
     getBalance(bankPk) {
         return this._marginfiAccount.getBalance(bankPk);
     }
-    updateAccountAddress(address) {
-        this._marginfiAccount.updateAccountAddress(address);
+    updateAccountAddressAndAuthority(address, authority) {
+        this._marginfiAccount.updateAccountAddressAndAuthority(address, authority);
     }
     canBeLiquidated() {
         const debugLogger = require("debug")(`mfi:margin-account:${this.address.toString()}:canBeLiquidated`);
@@ -266,8 +266,8 @@ class MarginfiAccountWrapper {
             marginfiAccount: previewMarginfiAccount,
         };
     }
-    async makeBorrowIx(amount, bankAddress, opt) {
-        return this._marginfiAccount.makeBorrowIx(this._program, this.client.banks, amount, bankAddress, opt);
+    async makeBorrowIx(amount, bankAddress, skipAtaSetup = true, opt) {
+        return this._marginfiAccount.makeBorrowIx(this._program, this.client.banks, amount, bankAddress, skipAtaSetup, opt);
     }
     async borrow(amount, bankAddress, priorityFeeUi) {
         const debug = require("debug")(`mfi:margin-account:${this.address.toString()}:borrow`);

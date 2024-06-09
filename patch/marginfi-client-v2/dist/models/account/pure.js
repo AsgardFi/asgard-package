@@ -29,7 +29,7 @@ class MarginfiAccount {
         this.balances = marginfiAccountRaw.lendingAccount.balances.map(balance_1.Balance.from);
         this.accountFlags = marginfiAccountRaw.accountFlags;
     }
-    updateAccountAddress(address) {
+    updateAccountAddressAndAuthority(address, authority) {
         // const existingData = {
         //   group: this.group,
         //   authority: this.authority,
@@ -38,6 +38,7 @@ class MarginfiAccount {
         // }
         // return new MarginfiAccount(address, existingData);
         this.address = address;
+        this.authority = authority;
     }
     static async fetch(address, client) {
         const data = (await client.program.account.marginfiAccount.fetch(address));
@@ -509,15 +510,19 @@ class MarginfiAccount {
             keys: [],
         };
     }
-    async makeBorrowIx(program, banks, amount, bankAddress, opt) {
+    async makeBorrowIx(program, banks, amount, bankAddress, skipAtaSetup, opt) {
         const bank = banks.get(bankAddress.toBase58());
         if (!bank)
             throw Error(`Bank ${bankAddress.toBase58()} not found`);
         let ixs = [];
         const userAta = (0, mrgn_common_1.getAssociatedTokenAddressSync)(bank.mint, this.authority, true); // We allow off curve addresses here to support Fuse.
-        // Add borrow-related instructions
-        const createAtaIdempotentIx = (0, mrgn_common_1.createAssociatedTokenAccountIdempotentInstruction)(this.authority, userAta, this.authority, bank.mint);
-        ixs.push(createAtaIdempotentIx);
+        // If skip ATA setup is true, we are not going to create ATAs
+        if (!skipAtaSetup) {
+            console.log(`Setup ATAs for borrow ix`);
+            // Add borrow-related instructions
+            const createAtaIdempotentIx = (0, mrgn_common_1.createAssociatedTokenAccountIdempotentInstruction)(this.authority, userAta, this.authority, bank.mint);
+            ixs.push(createAtaIdempotentIx);
+        }
         let remainingAccounts;
         if (opt?.observationBanksOverride !== undefined) {
             remainingAccounts = makeHealthAccountMetas(banks, opt.observationBanksOverride);

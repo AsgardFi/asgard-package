@@ -40,7 +40,7 @@ declare class MarginfiAccountWrapper {
     get isFlashLoanEnabled(): boolean;
     get isTransferAccountAuthorityEnabled(): boolean;
     getBalance(bankPk: PublicKey): Balance;
-    updateAccountAddress(address: PublicKey): void;
+    updateAccountAddressAndAuthority(address: PublicKey, authority: PublicKey): void;
     canBeLiquidated(): boolean;
     computeHealthComponents(marginRequirement: MarginRequirementType, excludedBanks?: PublicKey[]): {
         assets: BigNumber;
@@ -79,7 +79,7 @@ declare class MarginfiAccountWrapper {
     } | undefined): Promise<InstructionsWrapper>;
     withdraw(amount: Amount, bankAddress: PublicKey, withdrawAll?: boolean, priorityFeeUi?: number): Promise<string>;
     simulateWithdraw(amount: Amount, bankAddress: PublicKey, withdrawAll?: boolean): Promise<SimulationResult>;
-    makeBorrowIx(amount: Amount, bankAddress: PublicKey, opt?: {
+    makeBorrowIx(amount: Amount, bankAddress: PublicKey, skipAtaSetup?: boolean, opt?: {
         observationBanksOverride?: PublicKey[];
     } | undefined): Promise<InstructionsWrapper>;
     borrow(amount: Amount, bankAddress: PublicKey, priorityFeeUi?: number): Promise<string>;

@@ -426,6 +426,16 @@ class MarginfiClient {
     return marginfiAccounts;
   }
 
+  async getMarginfiPdaAccounts(address: Address): Promise<MarginfiAccountWrapper> {
+    // const _authority = authority ? translateAddress(authority) : this.provider.wallet.publicKey;
+    const _address = translateAddress(address)
+
+    const marginfiAccount = await MarginfiAccountWrapper.fetch(_address, this, 'confirmed');
+
+    return marginfiAccount;
+  }
+
+
   /**
    * Retrieves the addresses of all accounts owned by the marginfi program.
    *

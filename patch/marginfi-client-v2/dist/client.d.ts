@@ -81,6 +81,7 @@ declare class MarginfiClient {
      * @returns MarginfiAccount instances
      */
     getMarginfiAccountsForAuthority(authority?: Address): Promise<MarginfiAccountWrapper[]>;
+    getMarginfiPdaAccounts(address: Address): Promise<MarginfiAccountWrapper>;
     /**
      * Retrieves the addresses of all accounts owned by the marginfi program.
      *

@@ -138,8 +138,8 @@ class MarginfiAccountWrapper {
     return this._marginfiAccount.getBalance(bankPk);
   }
 
-  public updateAccountAddress(address: PublicKey) {
-    this._marginfiAccount.updateAccountAddress(address)
+  public updateAccountAddressAndAuthority(address: PublicKey, authority: PublicKey) {
+    this._marginfiAccount.updateAccountAddressAndAuthority(address, authority)
   }
 
   public canBeLiquidated(): boolean {
@@ -505,9 +505,10 @@ class MarginfiAccountWrapper {
   async makeBorrowIx(
     amount: Amount,
     bankAddress: PublicKey,
+    skipAtaSetup: boolean = true,
     opt?: { observationBanksOverride?: PublicKey[] } | undefined
   ): Promise<InstructionsWrapper> {
-    return this._marginfiAccount.makeBorrowIx(this._program, this.client.banks, amount, bankAddress, opt);
+    return this._marginfiAccount.makeBorrowIx(this._program, this.client.banks, amount, bankAddress, skipAtaSetup, opt);
   }
 
   async borrow(amount: Amount, bankAddress: PublicKey, priorityFeeUi?: number): Promise<string> {

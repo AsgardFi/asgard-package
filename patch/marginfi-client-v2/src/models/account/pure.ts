@@ -67,7 +67,7 @@ class MarginfiAccount {
     this.accountFlags = marginfiAccountRaw.accountFlags;
   }
 
-  updateAccountAddress(address: PublicKey) {
+  updateAccountAddressAndAuthority(address: PublicKey, authority: PublicKey) {
     // const existingData = {
     //   group: this.group,
     //   authority: this.authority,
@@ -76,6 +76,7 @@ class MarginfiAccount {
     // }
     // return new MarginfiAccount(address, existingData);
     this.address = address
+    this.authority = authority
   }
   static async fetch(address: PublicKey, client: MarginfiClient): Promise<MarginfiAccount> {
     const data: MarginfiAccountRaw = (await client.program.account.marginfiAccount.fetch(address)) as any;
@@ -789,6 +790,7 @@ class MarginfiAccount {
     banks: Map<string, Bank>,
     amount: Amount,
     bankAddress: PublicKey,
+    skipAtaSetup?: boolean,
     opt?: { observationBanksOverride?: PublicKey[] } | undefined
   ): Promise<InstructionsWrapper> {
     const bank = banks.get(bankAddress.toBase58());
@@ -798,14 +800,18 @@ class MarginfiAccount {
 
     const userAta = getAssociatedTokenAddressSync(bank.mint, this.authority, true); // We allow off curve addresses here to support Fuse.
 
-    // Add borrow-related instructions
-    const createAtaIdempotentIx = createAssociatedTokenAccountIdempotentInstruction(
-      this.authority,
-      userAta,
-      this.authority,
-      bank.mint
-    );
-    ixs.push(createAtaIdempotentIx);
+    // If skip ATA setup is true, we are not going to create ATAs
+    if (!skipAtaSetup) {
+      console.log(`Setup ATAs for borrow ix`)
+      // Add borrow-related instructions
+      const createAtaIdempotentIx = createAssociatedTokenAccountIdempotentInstruction(
+        this.authority,
+        userAta,
+        this.authority,
+        bank.mint
+      );
+      ixs.push(createAtaIdempotentIx);
+    }
 
     let remainingAccounts;
     if (opt?.observationBanksOverride !== undefined) {
